@@ -2,6 +2,8 @@
 
 Self-maintaining `.claude/` runtime. Turns a static config folder into living project memory — LLM-powered documentation review, project map generation, task queue, auto-fix, MCP plugin management, and project initialization.
 
+![cmdop-claude dashboard](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/plugins.png)
+
 **$0.001 per full cycle** (scan → review → fix → map) using DeepSeek V3.2 via SDKRouter.
 
 ## How it works
