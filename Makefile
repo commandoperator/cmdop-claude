@@ -1,4 +1,4 @@
-.PHONY: run dev install install-global test lint clean build publish publish-test patch minor major release
+.PHONY: run dev install install-global test lint clean build publish publish-test patch minor major release claude commit
 
 PORT ?= 8501
 PYTHON ?= python
@@ -73,6 +73,14 @@ release: test patch
 	git add pyproject.toml
 	git commit -m "release: v$$(python -c "import tomli; print(tomli.load(open('pyproject.toml','rb'))['project']['version'])")"
 	git push origin main
+
+# ── Claude & Git ─────────────────────────────────────────────────────
+
+claude:
+	claude --dangerously-skip-permissions --chrome
+
+commit:
+	git add . && orc commit
 
 # ── Clean ────────────────────────────────────────────────────────────
 
