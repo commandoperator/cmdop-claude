@@ -272,6 +272,7 @@ def _build_fallback_claude_md(
     lines.append("- Periodically check `.claude/.sidecar/tasks/` for pending review items")
     lines.append("- After major changes, run `sidecar_scan` to review docs and `sidecar_map` to update the project map")
     lines.append("- Read `.claude/rules/` for project-specific coding guidelines")
+    lines.append("- When working with external APIs, databases, browsers, or new tools — check if a relevant MCP plugin exists via `make -C .claude dashboard` (Plugin Browser tab)")
     lines.append("- Keep this file under 200 lines — move detailed rules to `.claude/rules/*.md`")
     lines.append("")
 

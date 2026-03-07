@@ -164,6 +164,7 @@ Generate:
      - After major changes, use sidecar tools: `sidecar_scan` to review docs, `sidecar_map` to update project map
      - Read `.claude/rules/` for project-specific coding guidelines before making changes
      - Keep CLAUDE.md under 200 lines — move detailed rules to `.claude/rules/*.md`
+     - When working with external APIs, databases, browsers, or new tools — check if a relevant MCP plugin exists: use `sidecar_tasks` or browse plugins via `make -C .claude dashboard` (Plugin Browser tab). Installing the right MCP server can save significant time.
    - ## Key Rules (5-8 bullet points specific to this project)
 2. 2-3 rules files in .claude/rules/ (e.g. ".claude/rules/testing.md") — specific to the detected tech stack. Each rule file must have 10+ lines with actionable guidelines.
 
