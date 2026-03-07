@@ -158,6 +158,19 @@ make -C .claude dashboard
 
 **Plugin Browser** searches Smithery + Official MCP registries (~1000 plugins), with background index pre-caching and install/uninstall to `~/.claude.json`. Supports both command-based (stdio) and remote URL (streamable-http) servers.
 
+<details>
+<summary>Dashboard Screenshots</summary>
+
+| | |
+|---|---|
+| ![Health Auditor](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/auditor.png) | ![MCP Studio & Plugins](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/mcp.png) |
+| ![Plugin Browser](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/plugins.png) | ![Project Map](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/map.png) |
+| ![Task Queue](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/tasks.png) | ![Sidecar Monitor](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/monitor.png) |
+| ![Hooks Manager](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/hooks.png) | ![Skill Studio](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/skills.png) |
+| ![Settings & Security](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/settings.png) | ![Trigger Graph](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/graph.png) |
+
+</details>
+
 ### Generated `.claude/Makefile`
 
 `register` / `setup` generates a convenience Makefile in each project:
