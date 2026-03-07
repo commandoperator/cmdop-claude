@@ -1,0 +1,4 @@
+[project]
+name = "my-cli"
+version = "0.1.0"
+dependencies = ["click>=8.0", "rich>=13.0", "httpx>=0.27"]

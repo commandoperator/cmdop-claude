@@ -1,0 +1,29 @@
+{
+  "allowed_operations": {
+    "file_operations": {
+      "read": true,
+      "create": true,
+      "edit": true,
+      "delete": false
+    },
+    "system_operations": {
+      "install_packages": false,
+      "run_as_sudo": false
+    },
+    "git_operations": {
+      "clone": true,
+      "commit": true,
+      "push": false
+    },
+    "code_execution": {
+      "run_scripts": true,
+      "run_tests": true
+    }
+  },
+  "custom_rules": [
+    {
+      "pattern": "^rm -rf /",
+      "allowed": false
+    }
+  ]
+}

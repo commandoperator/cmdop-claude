@@ -1,0 +1,84 @@
+[project]
+name = "cmdop-claude"
+version = "0.1.9"
+description = "Self-maintaining .claude/ runtime — LLM-powered doc review, project map, task queue, auto-fix, and project init"
+readme = "README.md"
+license = "MIT"
+authors = [
+    {name = "markinmatrix"}
+]
+keywords = ["claude", "claude-code", "mcp", "documentation", "sidecar"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Documentation",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    "python-frontmatter>=1.1.0",
+    "sdkrouter>=0.1.0",
+    "fastmcp>=3.0.0",
+    "tomli>=2.0.0; python_version < '3.11'",
+]
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+ui = [
+    "streamlit>=1.32.0",
+    "streamlit-agraph>=0.0.45",
+    "watchdog>=4.0.0",
+    "GitPython>=3.1.42",
+    "streamlit-shadcn-ui>=0.1.19",
+    "streamlit-option-menu>=0.3.12",
+    "streamlit-extras>=0.3.6",
+    "streamlit-jodit>=3.1.0",
+    "markdownify>=1.2.2",
+    "Markdown>=3.10.2",
+]
+dev = [
+    "pytest>=8.0",
+    "black>=24.0",
+    "isort>=5.13",
+    "build>=1.0",
+    "twine>=5.0",
+]
+
+[project.urls]
+Repository = "https://github.com/cmdop/cmdop-claude"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["cmdop_claude"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"

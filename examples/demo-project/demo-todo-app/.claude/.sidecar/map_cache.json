@@ -1,0 +1,30 @@
+{
+  ".": {
+    "hash": "709cb071da4082a4",
+    "annotation": "Project root with build configuration, dependency management, and developer documentation."
+  },
+  "src/todo_app": {
+    "hash": "1dc0fec8c723cf9d",
+    "annotation": "Main Python package containing application configuration and the FastAPI server entry point."
+  },
+  "src/todo_app/api": {
+    "hash": "3655bf6ab1a3145d",
+    "annotation": "FastAPI route definitions and authentication handlers for the REST API."
+  },
+  "src/todo_app/db": {
+    "hash": "b7346cd274270d5a",
+    "annotation": "SQLAlchemy database engine configuration and session management."
+  },
+  "src/todo_app/models": {
+    "hash": "297777ce9e4f654c",
+    "annotation": "Pydantic data models for request/response validation and serialization."
+  },
+  "src/todo_app/services": {
+    "hash": "d9f24a3c3aa85fcc",
+    "annotation": "Business logic layer for todo operations, separate from API routes."
+  },
+  "tests": {
+    "hash": "de7d3f2e5e4cd416",
+    "annotation": "Pytest test suite with service layer tests and shared fixtures."
+  }
+}
