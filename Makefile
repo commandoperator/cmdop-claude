@@ -1,4 +1,4 @@
-.PHONY: run dev install install-global test lint clean build publish publish-test patch minor major
+.PHONY: run dev install install-global test lint clean build publish publish-test patch minor major release
 
 PORT ?= 8501
 PYTHON ?= python
@@ -65,6 +65,14 @@ publish: build
 
 publish-test: build
 	python -m twine upload --repository testpypi dist/*
+
+release: test patch
+	@echo "── Building & publishing v$$(python -c "import tomli; print(tomli.load(open('pyproject.toml','rb'))['project']['version'])") ──"
+	$(MAKE) build
+	python -m twine upload dist/*
+	git add pyproject.toml
+	git commit -m "release: v$$(python -c "import tomli; print(tomli.load(open('pyproject.toml','rb'))['project']['version'])")"
+	git push origin main
 
 # ── Clean ────────────────────────────────────────────────────────────
 
