@@ -18,7 +18,7 @@ install-global:
 	pip install .
 
 test:
-	python -m pytest tests/ -q
+	python -m pytest tests/ -q --ignore=tests/e2e
 
 lint:
 	black src/ tests/

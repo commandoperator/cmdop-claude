@@ -1,6 +1,6 @@
 [project]
 name = "cmdop-claude"
-version = "0.1.12"
+version = "0.1.13"
 description = "Self-maintaining .claude/ runtime — LLM-powered doc review, project map, task queue, auto-fix, and project init"
 readme = "README.md"
 license = "MIT"
@@ -48,7 +48,8 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/cmdop/cmdop-claude"
+Homepage = "https://cmdop.com"
+Repository = "https://github.com/commandoperator/cmdop-claude"
 
 [build-system]
 requires = ["setuptools>=61.0"]
