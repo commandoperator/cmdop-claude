@@ -1,12 +1,46 @@
 """Typed model for ~/.claude/cmdop.json — global cmdop-claude configuration."""
 from __future__ import annotations
 
+import importlib.resources
 import json
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from .base import CoreModel
+
+
+class DocsSource(CoreModel):
+    """A single documentation source with path and human-readable description."""
+
+    path: str
+    description: str = ""
+
+    model_config = {"populate_by_name": True}
+
+
+def _default_docs_sources() -> list[DocsSource]:
+    """Return bundled docs shipped with the package as the default source."""
+    try:
+        p = importlib.resources.files("cmdop_claude") / "docs"
+        return [DocsSource(path=str(p), description="cmdop-claude bundled docs")]
+    except Exception:
+        return []
+
+
+def _coerce_docs_sources(value: object) -> list[DocsSource]:
+    """Accept list[str] or list[dict] or list[DocsSource] — all valid in JSON."""
+    if not isinstance(value, list):
+        return _default_docs_sources()
+    result = []
+    for item in value:
+        if isinstance(item, str):
+            result.append(DocsSource(path=item, description=""))
+        elif isinstance(item, dict):
+            result.append(DocsSource(**item))
+        elif isinstance(item, DocsSource):
+            result.append(item)
+    return result
 
 # Canonical location — never changes
 CMDOP_JSON_PATH = Path.home() / ".claude" / "cmdop.json"
@@ -52,6 +86,23 @@ class CmdopConfig(CoreModel):
         default="", alias="globalDir",
         description="Override for global cache dir. Default: ~/.claude/cmdop/",
     )
+
+    # Docs sources — bundled docs by default, override via docsPaths in cmdop.json
+    # Accepts list[str] (legacy) or list[{path, description}] (new format)
+    docs_sources: list[DocsSource] = Field(
+        default_factory=_default_docs_sources,
+        alias="docsPaths",
+    )
+
+    @field_validator("docs_sources", mode="before")
+    @classmethod
+    def coerce_docs_sources(cls, v: object) -> list[DocsSource]:
+        return _coerce_docs_sources(v)
+
+    @property
+    def docs_paths(self) -> list[str]:
+        """Convenience accessor — list of paths only (for DocsService)."""
+        return [s.path for s in self.docs_sources]
 
     # Feature flags
     debug_mode: bool = Field(default=False, alias="debugMode")

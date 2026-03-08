@@ -7,6 +7,7 @@ from cmdop_claude import Client
 from ._auditor import render_auditor
 from ._skills import render_skills
 from ._mcp import render_mcp_studio, render_plugin_browser
+from ._docs import render_docs_browser
 from ._hooks import render_hooks
 from ._sidecar import render_sidecar
 from ._project_map import render_project_map
@@ -19,6 +20,8 @@ __all__ = [
     "render_auditor",
     "render_skills",
     "render_mcp_studio",
+    "render_plugin_browser",
+    "render_docs_browser",
     "render_hooks",
     "render_sidecar",
     "render_project_map",
@@ -43,8 +46,8 @@ def main() -> None:
         st.markdown("### 🤖 Command Center")
         selected = option_menu(
             menu_title=None,
-            options=["Health Auditor", "Skill Studio", "MCP Studio", "Plugin Browser", "Hooks Manager", "Sidecar Monitor", "Project Map", "Task Queue", "Settings & Security", "Trigger Graph"],
-            icons=["heart-pulse", "stars", "box", "puzzle", "plug", "book", "map", "list-task", "shield-lock", "diagram-project"],
+            options=["Health Auditor", "Skill Studio", "MCP Studio", "Plugin Browser", "Docs Browser", "Hooks Manager", "Sidecar Monitor", "Project Map", "Task Queue", "Settings & Security", "Trigger Graph"],
+            icons=["heart-pulse", "stars", "box", "puzzle", "book-half", "plug", "book", "map", "list-task", "shield-lock", "diagram-project"],
             menu_icon="cast",
             default_index=0,
             styles={
@@ -58,6 +61,7 @@ def main() -> None:
         "Skill Studio": render_skills,
         "MCP Studio": render_mcp_studio,
         "Plugin Browser": render_plugin_browser,
+        "Docs Browser": render_docs_browser,
         "Hooks Manager": render_hooks,
         "Sidecar Monitor": render_sidecar,
         "Project Map": render_project_map,

@@ -1,4 +1,4 @@
-.PHONY: run dev install install-global test lint clean build publish publish-test patch minor major release claude commit
+.PHONY: run dev install install-global test lint clean build publish publish-test patch minor major release claude commit sync-docs
 
 PORT ?= 8501
 PYTHON ?= python
@@ -6,9 +6,11 @@ PYTHON ?= python
 # ── Dev ──────────────────────────────────────────────────────────────
 
 run:
+	-pkill -f "streamlit run" 2>/dev/null; sleep 1
 	PYTHONPATH=./src:$$PYTHONPATH $(PYTHON) -m streamlit run src/cmdop_claude/ui/main.py --server.port $(PORT)
 
 dev:
+	-pkill -f "streamlit run" 2>/dev/null; sleep 1
 	PYTHONPATH=./src:$$PYTHONPATH $(PYTHON) -m streamlit run src/cmdop_claude/ui/main.py --server.port $(PORT) --server.runOnSave true
 
 install:
@@ -55,15 +57,30 @@ major:
 	t = open('pyproject.toml').read(); \
 	open('pyproject.toml','w').write(t.replace('version = \"$(VERSION)\"', f'version = \"{v}\"'))"
 
+# ── Docs sync ────────────────────────────────────────────────────────
+
+# Path to local djangocfg checkout (same pattern as projects/solution/django/Makefile)
+DJANGO_CFG_LOCAL := $(HOME)/djangocfg
+DOCS_SRC         := $(DJANGO_CFG_LOCAL)/@doc-internal
+DOCS_DB          := src/cmdop_claude/docs/docs.db
+
+sync-docs:
+	@echo "Building docs FTS5 index from $(DOCS_SRC)..."
+	@PYTHONPATH=./src python -c "\
+from pathlib import Path; \
+from cmdop_claude.services.docs_builder import build_db; \
+n = build_db(Path('$(DOCS_SRC)'), Path('$(DOCS_DB)'), 'djangocfg'); \
+print(f'Done. Indexed {n} files → $(DOCS_DB)')"
+
 # ── Build & Publish ──────────────────────────────────────────────────
 
 build: clean
 	python -m build
 
-publish: build
+publish: sync-docs build
 	python -m twine upload dist/*
 
-publish-test: build
+publish-test: sync-docs build
 	python -m twine upload --repository testpypi dist/*
 
 release: test patch

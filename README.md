@@ -17,6 +17,7 @@ Claude Code's `.claude/` folder is powerful but static. `cmdop-claude` makes it 
 - **Task queue** — review findings become structured tasks (`T-001.md`, `T-002.md`, ...). Top pending items injected into every prompt automatically.
 - **Auto-fix** — LLM generates targeted file edits for any task. Preview diff or apply directly.
 - **Project init** — bootstraps `CLAUDE.md` + rules from scratch for bare projects. Two-step LLM pipeline: cheap model selects which files to read → balanced model generates project-specific docs.
+- **Docs search** — agents call `docs_search` / `docs_get` MCP tools to find and read bundled documentation (djangocfg guides, etc.) with BM25 full-text search. No external service.
 - **Plugin browser** — searches Smithery + Official MCP registries (~1000 plugins), installs to `~/.claude.json`.
 
 Everything runs as Claude Code hooks. Zero manual steps after setup.
@@ -45,6 +46,12 @@ sidecar_init (MCP tool / CLI)
   └─ Step 2 (balanced LLM): read selected files (40 lines each) → generate
       ├─ CLAUDE.md — project-specific, references actual files/libs
       └─ .claude/rules/*.md — tech-stack rules with real file citations
+
+docs_search / docs_get (MCP tools)
+  ├─ bundled docs.db (SQLite FTS5) shipped inside the package
+  ├─ BM25 ranking + Porter stemmer ("migrat*" → migration/migrate/...)
+  ├─ phrase search ("django migration"), prefix (migrat*), boolean (AND/NOT)
+  └─ user can add custom sources via ~/.claude/cmdop.json → docsPaths
 ```
 
 ---
@@ -103,6 +110,20 @@ python -m cmdop_claude.sidecar.hook unregister
 | `sidecar_fix` | yes | Generate fix for a task (dry-run or apply) |
 | `sidecar_init` | yes | Bootstrap `.claude/` for bare projects |
 | `sidecar_activity` | no | View recent action log |
+| `docs_search` | no | Full-text search across bundled + custom docs |
+| `docs_get` | no | Read a documentation file by path |
+
+All sidecar tools are called **directly** — they are not deferred tools, do not search for them via ToolSearch.
+
+### docs_search query syntax
+
+```
+migration              # word + stemmed forms (migrate, migrations)
+"django migration"     # exact phrase
+django AND testing     # both words required
+migrat*                # prefix match
+django NOT celery      # exclusion
+```
 
 ---
 
@@ -149,9 +170,11 @@ make run              # http://localhost:8501
 make -C .claude dashboard  # from project with generated Makefile
 ```
 
-10 tabs: Health Auditor, Skill Studio, MCP Studio, Plugin Browser, Hooks Manager, Sidecar Monitor, Project Map, Task Queue, Settings & Security, Trigger Graph.
+11 tabs: Health Auditor, Skill Studio, MCP Studio, Plugin Browser, **Docs Browser**, Hooks Manager, Sidecar Monitor, Project Map, Task Queue, Settings & Security, Trigger Graph.
 
-**Plugin Browser** searches Smithery + Official MCP registries (~1000 plugins) with background index caching. Supports stdio and streamable-http servers.
+**Docs Browser** — search and read bundled documentation directly in the UI. Shows all indexed files grouped by source, with full-text search and inline markdown rendering.
+
+**Plugin Browser** searches Smithery + Official MCP registries (~1000 plugins) with background index caching.
 
 | | |
 |---|---|
@@ -178,6 +201,49 @@ export SDKROUTER_API_KEY=your-key
 # or
 echo '{"sdkrouterApiKey": "your-key"}' > ~/.claude/cmdop.json
 ```
+
+### Docs Sources
+
+By default, `docs_search` searches the bundled `docs.db` shipped with the package.
+Add custom sources in `~/.claude/cmdop.json`:
+
+```json
+{
+  "sdkrouterApiKey": "...",
+  "docsPaths": [
+    {
+      "path": "/path/to/your/docs",
+      "description": "My project docs — API reference, guides"
+    },
+    {
+      "path": "/path/to/prebuilt.db",
+      "description": "Pre-built FTS5 index"
+    }
+  ]
+}
+```
+
+Each source can be:
+- A **directory** of `.md` / `.mdx` files — indexed in-memory on demand
+- A **`.db` file** — pre-built SQLite FTS5 index, fastest option
+
+MDX files are automatically converted to clean Markdown (JSX/imports stripped).
+
+### Bundled Docs (for package maintainers)
+
+To bundle your own docs into the package, update `Makefile`:
+
+```makefile
+DOCS_SRC := /path/to/your/docs
+DOCS_DB  := src/cmdop_claude/docs/docs.db
+
+sync-docs:
+    python -c "from pathlib import Path; \
+    from cmdop_claude.services.docs_builder import build_db; \
+    build_db(Path('$(DOCS_SRC)'), Path('$(DOCS_DB)'), 'my-docs')"
+```
+
+Then run `make sync-docs` before `make publish`.
 
 ### Environment Variables
 
@@ -226,6 +292,7 @@ src/cmdop_claude/
 ├── _client.py                  # Client entry point (lazy service props)
 ├── models/
 │   ├── base.py                 # CoreModel (strict Pydantic v2)
+│   ├── cmdop_config.py         # CmdopConfig, DocsSource — ~/.claude/cmdop.json
 │   ├── git_context.py          # RepoInfo, GitContext, LLMRepoClassification
 │   ├── sidecar.py              # Review, Fix, Init, Map, ActivityEntry
 │   ├── project_map.py          # Map annotation models
@@ -233,6 +300,8 @@ src/cmdop_claude/
 │   ├── mcp.py                  # MCPServerCommand, MCPServerURL, MCPConfig
 │   └── plugin.py               # MCPPluginInfo, PluginCache
 ├── services/
+│   ├── docs_service.py         # DocsService — SQLite FTS5 search + MDX converter
+│   ├── docs_builder.py         # build_db — indexes docs into docs.db at publish time
 │   ├── plugin_service.py       # Registry search, install, background indexing
 │   ├── mcp_service.py          # MCP config read/write
 │   └── sidecar_service/
@@ -243,14 +312,16 @@ src/cmdop_claude/
 │       ├── _tasks.py           # Task CRUD
 │       ├── _mcp.py             # MCP registration + hooks + Makefile
 │       └── _status.py          # Status + map access
+├── docs/
+│   └── docs.db                 # Bundled SQLite FTS5 index (djangocfg guides)
 └── sidecar/
-    ├── server.py               # FastMCP server (12 tools)
+    ├── server.py               # FastMCP server (14 tools)
     ├── hook.py                 # CLI (11 commands)
-    ├── git_context.py          # GitContextService — own vs external repo classification
-    ├── text_utils.py           # normalize_content — strip control chars, collapse blank lines
+    ├── git_context.py          # GitContextService
+    ├── text_utils.py           # normalize_content
     ├── tree_summarizer.py      # TreeSummarizer — chunked parallel LLM dir analysis
     ├── toon.py                 # TOON serializer — token-efficient tree format
-    ├── merkle_cache.py         # MerkleCache — SHA256 dir hashing, skips LLM for unchanged
+    ├── merkle_cache.py         # MerkleCache — SHA256 dir hashing
     ├── mapper.py               # Project map generator
     ├── scanner.py              # .claude/ filesystem scanner
     ├── exclusions.py           # Junk filter + .gitignore integration
@@ -271,8 +342,7 @@ src/cmdop_claude/
 | Project init | ~5000 | ~$0.001 |
 | Map generation (45 dirs) | ~5000 | ~$0.001 |
 | Map incremental (cached dirs) | 0 | $0.00 |
-| Init (cached dirs via MerkleCache) | 0 | $0.00 |
-| Auto-scan (1×/day) | ~1800 | ~$0.0005 |
+| docs_search / docs_get | 0 | $0.00 |
 | Read-only operations | 0 | $0.00 |
 
 **Full cycle: ~$0.003. Daily estimate: ~$0.001–0.003/day.**
@@ -282,7 +352,7 @@ src/cmdop_claude/
 ## Testing
 
 ```bash
-make test   # 375+ tests
+make test   # 342+ tests
 ```
 
 ---

@@ -273,5 +273,49 @@ def sidecar_activity(limit: int = 20) -> str:
     return "\n".join(lines)
 
 
+@mcp.tool()
+def docs_search(query: str) -> str:
+    """Search project documentation by keyword.
+
+    Searches bundled docs shipped with cmdop-claude plus any paths configured
+    in ~/.claude/cmdop.json → docsPaths. Returns matching file paths with excerpts.
+
+    Args:
+        query: keyword or phrase to search for
+    """
+    from ..services.docs_service import DocsService
+
+    cfg = get_config()
+    docs_paths = cfg.cmdop.docs_paths
+    if not docs_paths:
+        return "No docs configured. Add docsPaths to ~/.claude/cmdop.json."
+    svc = DocsService(docs_paths)
+    results = svc.search(query)
+    if not results:
+        return f"No results for: {query}"
+    lines = [f"Found {len(results)} result(s) for '{query}':", ""]
+    for r in results:
+        lines.append(f"- {r['path']}")
+        lines.append(f"  {r['excerpt'][:120].strip()}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def docs_get(path: str) -> str:
+    """Read a documentation file by path returned from docs_search.
+
+    MDX files are automatically converted to clean Markdown.
+
+    Args:
+        path: absolute path to the doc file (as returned by docs_search)
+    """
+    from ..services.docs_service import DocsService
+
+    cfg = get_config()
+    svc = DocsService(cfg.cmdop.docs_paths or [])
+    return svc.get(path)
+
+
 if __name__ == "__main__":
     mcp.run()

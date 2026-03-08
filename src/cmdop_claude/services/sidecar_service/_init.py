@@ -44,6 +44,37 @@ _SKIP_DIRS = frozenset({
 })
 
 
+def _build_docs_block() -> tuple[str, str]:
+    """Build docs context block and workflow hint from configured DocsSource list.
+
+    Returns:
+        (docs_block, docs_workflow_hint) — both empty strings if no sources configured.
+    """
+    try:
+        from ...models.cmdop_config import CmdopConfig
+        cfg = CmdopConfig.load()
+        sources = cfg.docs_sources
+    except Exception:
+        return "(no documentation sources configured)", ""
+
+    if not sources:
+        return "(no documentation sources configured)", ""
+
+    lines = []
+    for s in sources:
+        desc = s.description or s.path
+        lines.append(f"- **{desc}** — `docs_search` / `docs_get` MCP tools")
+
+    docs_block = "\n".join(lines)
+    # Build a workflow hint referencing real source descriptions
+    source_names = ", ".join(s.description or s.path for s in sources if s.description or s.path)
+    docs_workflow_hint = (
+        f"Use `docs_search` to find relevant guides in: {source_names}. "
+        "Call `docs_get` with the returned path to read the full file."
+    )
+    return docs_block, docs_workflow_hint
+
+
 def _read_readme(root: Path, max_chars: int = 800) -> str:
     for name in ("README.md", "readme.md", "README.rst", "README"):
         p = root / name
@@ -391,6 +422,9 @@ class InitMixin(SidecarBase):
             ]
             snippets_block = _read_selected_files(project_root, fallback_files, lines_per_file=20)
 
+        # Build docs block from configured sources
+        docs_block, docs_workflow_hint = _build_docs_block()
+
         user_msg = INIT_USER.format(
             deps_block=deps_block,
             git_repos_block=git_ctx_block or "(no git repos found)",
@@ -400,6 +434,8 @@ class InitMixin(SidecarBase):
             makefile_block=makefile_block or "(no Makefile)",
             pyproject_block=pyproject_block or "(no project configs found)",
             snippets_block=snippets_block or "(no code snippets available)",
+            docs_block=docs_block,
+            docs_workflow_hint=docs_workflow_hint,
         )
         # Note: entry_points removed — LLM now selects entry point files directly in Step 1
 

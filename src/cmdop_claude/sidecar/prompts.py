@@ -222,6 +222,9 @@ Output JSON with EXACTLY these field names:
 ## Code snippets (key files — configs, entry points, core modules)
 {snippets_block}
 
+## Available documentation sources (searchable via MCP tools)
+{docs_block}
+
 ---
 
 Generate:
@@ -233,11 +236,12 @@ Generate:
    - ## Workflow — MANDATORY section, always include these rules:
      - Before starting complex tasks, check `.claude/plans/` for existing plans and save new plans there
      - Periodically use `sidecar_tasks` MCP tool to check pending tasks (do NOT use built-in TaskList — it is unrelated)
-     - Sidecar MCP tools (`sidecar_tasks`, `sidecar_scan`, `sidecar_map`) are called directly — they are NOT deferred tools, do NOT search for them via ToolSearch
+     - Sidecar MCP tools (`sidecar_tasks`, `sidecar_scan`, `sidecar_map`, `docs_search`, `docs_get`) are called directly — they are NOT deferred tools, do NOT search for them via ToolSearch
      - After major changes, use sidecar tools: `sidecar_scan` to review docs, `sidecar_map` to update project map
      - Read `.claude/rules/` for project-specific coding guidelines before making changes
      - Keep CLAUDE.md under 200 lines — move detailed rules to `.claude/rules/*.md`
      - When working with external APIs, databases, browsers, or new tools — check if a relevant MCP plugin exists: use `sidecar_tasks` or browse plugins via `make -C .claude dashboard` (Plugin Browser tab). Installing the right MCP server can save significant time.
+     - {docs_workflow_hint}
    - ## Key Rules (5-8 bullet points — MUST reference actual file names, libraries, or patterns from the snippets above. NO generic rules like "use PEP 8" or "write tests".)
 2. 2-3 rules files in .claude/rules/ (e.g. ".claude/rules/testing.md") — specific to THIS project's tech stack and patterns. Rules MUST cite specific files, classes, or patterns seen in the code snippets. Each rule file must have 10+ lines.
 
