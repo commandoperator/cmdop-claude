@@ -16,6 +16,7 @@ from ...sidecar.prompts import (
     FILE_SELECT_SYSTEM, FILE_SELECT_USER,
     INIT_SYSTEM, INIT_USER,
 )
+from ...sidecar.text_utils import normalize_content
 from ...sidecar.tree_summarizer import TreeSummarizer
 from ._base import SidecarBase
 
@@ -457,7 +458,7 @@ class InitMixin(SidecarBase):
                 path = "CLAUDE.md"
             fpath = project_root / path
             fpath.parent.mkdir(parents=True, exist_ok=True)
-            fpath.write_text(f.content.strip() + "\n", encoding="utf-8")
+            fpath.write_text(normalize_content(f.content) + "\n", encoding="utf-8")
             files_created.append(path)
 
         self._log_activity(
