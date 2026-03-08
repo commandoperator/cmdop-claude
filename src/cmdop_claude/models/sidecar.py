@@ -128,6 +128,14 @@ class LLMFixResponse(BaseModel):
     )
 
 
+class LLMFileSelectResponse(BaseModel):
+    """Step 1 of init — LLM selects which files to read."""
+
+    files: list[str] = Field(
+        description="Relative paths of files to read",
+    )
+
+
 class LLMInitFile(BaseModel):
     """Single file in init response."""
 

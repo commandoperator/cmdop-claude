@@ -1,6 +1,6 @@
 [project]
 name = "cmdop-claude"
-version = "0.1.22"
+version = "0.1.25"
 description = "Self-maintaining .claude/ runtime — LLM-powered doc review, project map, task queue, auto-fix, and project init"
 readme = "README.md"
 license = "MIT"

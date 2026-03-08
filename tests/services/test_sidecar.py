@@ -13,6 +13,7 @@ from cmdop_claude.models.sidecar import (
     DocScanResult,
     FixResult,
     InitResult,
+    LLMFileSelectResponse,
     LLMFixResponse,
     LLMInitFile,
     LLMInitResponse,
@@ -589,7 +590,19 @@ def test_fix_task_missing_file_creates_it(service, mock_sdk, tmp_path: Path) -> 
 # ── init_project ────────────────────────────────────────────────────
 
 
+def _mock_file_select_response(files: list[str] | None = None) -> SimpleNamespace:
+    """Mock Step 1: file selection response."""
+    return SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(
+            parsed=LLMFileSelectResponse(files=files or ["pyproject.toml"])
+        ))],
+        usage=SimpleNamespace(total_tokens=10),
+        model="test/cheap-model",
+    )
+
+
 def _mock_init_response(files: list[LLMInitFile], tokens: int = 300) -> SimpleNamespace:
+    """Mock Step 2: generate CLAUDE.md + rules response."""
     return SimpleNamespace(
         choices=[SimpleNamespace(message=SimpleNamespace(
             parsed=LLMInitResponse(files=files)
@@ -611,10 +624,14 @@ def test_init_project_skips_existing(service, tmp_path: Path) -> None:
 
 
 def test_init_project_generates_files(service, mock_sdk, tmp_path: Path) -> None:
-    mock_sdk.parse.return_value = _mock_init_response([
-        LLMInitFile(path="CLAUDE.md", content="# My Project\n\n## Tech Stack\n- Python 3.10+\n- FastAPI\n- PostgreSQL\n\n## Commands\n- make test\n- make run\n\n## Architecture\n- src/ — main source code\n"),
-        LLMInitFile(path=".claude/rules/api.md", content="# API Rules\n\n- Use REST conventions\n- Return JSON responses\n- Validate with Pydantic\n- Handle errors with HTTPException\n- Use dependency injection\n"),
-    ])
+    # Step 1: file selection, Step 2: generate (called up to 3 times on retry)
+    mock_sdk.parse.side_effect = [
+        _mock_file_select_response(["pyproject.toml"]),
+        _mock_init_response([
+            LLMInitFile(path="CLAUDE.md", content="# My Project\n\n## Tech Stack\n- Python 3.10+\n- FastAPI\n- PostgreSQL\n\n## Commands\n- make test\n- make run\n\n## Architecture\n- src/ — main source code\n"),
+            LLMInitFile(path=".claude/rules/api.md", content="# API Rules\n\n- Use REST conventions\n- Return JSON responses\n- Validate with Pydantic\n- Handle errors with HTTPException\n- Use dependency injection\n"),
+        ]),
+    ]
 
     result = service.init_project()
 
@@ -631,11 +648,16 @@ def test_init_project_generates_files(service, mock_sdk, tmp_path: Path) -> None
 
 def test_init_project_none_parsed_uses_fallback(service, mock_sdk, tmp_path: Path) -> None:
     """When LLM returns None, fallback generates CLAUDE.md from scan data."""
-    mock_sdk.parse.return_value = SimpleNamespace(
+    _none_resp = SimpleNamespace(
         choices=[SimpleNamespace(message=SimpleNamespace(parsed=None))],
         usage=SimpleNamespace(total_tokens=50),
         model="test/cheap-model",
     )
+    # Step 1 (file select) succeeds, Step 2 retries 3× returning None
+    mock_sdk.parse.side_effect = [
+        _mock_file_select_response(),
+        _none_resp, _none_resp, _none_resp,
+    ]
 
     result = service.init_project()
 
@@ -648,10 +670,13 @@ def test_init_project_none_parsed_uses_fallback(service, mock_sdk, tmp_path: Pat
 
 
 def test_init_project_tracks_usage(service, mock_sdk) -> None:
-    mock_sdk.parse.return_value = _mock_init_response(
-        [LLMInitFile(path="CLAUDE.md", content="# Project\n\n## Tech Stack\n- Python\n- FastAPI\n\n## Commands\n- make test\n- make run\n\n## Architecture\n- src/ — source\n")],
-        tokens=400,
-    )
+    mock_sdk.parse.side_effect = [
+        _mock_file_select_response(),
+        _mock_init_response(
+            [LLMInitFile(path="CLAUDE.md", content="# Project\n\n## Tech Stack\n- Python\n- FastAPI\n\n## Commands\n- make test\n- make run\n\n## Architecture\n- src/ — source\n")],
+            tokens=400,
+        ),
+    ]
 
     service.init_project()
 
@@ -661,10 +686,13 @@ def test_init_project_tracks_usage(service, mock_sdk) -> None:
 
 def test_init_project_creates_subdirs(service, mock_sdk, tmp_path: Path) -> None:
     """Init should create parent directories for nested rule files."""
-    mock_sdk.parse.return_value = _mock_init_response([
-        LLMInitFile(path="CLAUDE.md", content="# Proj\n\n## Tech Stack\n- Python 3.10+\n- FastAPI\n- PostgreSQL\n\n## Commands\n- make test — run tests\n- make run — start server\n\n## Architecture\n- src/ — main source code directory\n"),
-        LLMInitFile(path=".claude/rules/deep/nested.md", content="# Deep rule\n\n- Follow coding conventions strictly\n- Use type hints everywhere\n- Write comprehensive tests\n- Handle errors gracefully\n- Document all public APIs\n"),
-    ])
+    mock_sdk.parse.side_effect = [
+        _mock_file_select_response(),
+        _mock_init_response([
+            LLMInitFile(path="CLAUDE.md", content="# Proj\n\n## Tech Stack\n- Python 3.10+\n- FastAPI\n- PostgreSQL\n\n## Commands\n- make test — run tests\n- make run — start server\n\n## Architecture\n- src/ — main source code directory\n"),
+            LLMInitFile(path=".claude/rules/deep/nested.md", content="# Deep rule\n\n- Follow coding conventions strictly\n- Use type hints everywhere\n- Write comprehensive tests\n- Handle errors gracefully\n- Document all public APIs\n"),
+        ]),
+    ]
 
     result = service.init_project()
 

@@ -139,6 +139,38 @@ For each directory provide:
 - key_files: entry points and important config files (max 5)
 - commands: detected Makefile targets or run scripts (max 5)"""
 
+# ── File selection prompts (Step 1 of init) ─────────────────────────
+
+FILE_SELECT_SYSTEM = (
+    "You are a code analyst. Given a project file tree, select the most informative "
+    "files to understand this project's architecture, conventions, and patterns. "
+    "Prioritize: config files (pyproject.toml, package.json, go.mod), entry points "
+    "(main.py, app.py, index.ts, manage.py), core domain files (models, routes, schemas, "
+    "services, handlers), and infrastructure (Dockerfile, docker-compose). "
+    "ALWAYS include root-level Makefile if present — it reveals all available commands. "
+    "Skip: test files, migrations, generated files, lock files, minified JS, binary assets. "
+    "Return at most 25 files. Quality over quantity."
+)
+
+FILE_SELECT_USER = """\
+Select the most informative files to read from this project.
+
+## File tree
+{file_tree}
+
+## README excerpt
+{readme_block}
+
+## Dependencies
+{deps_block}
+
+---
+
+Return JSON: {{"files": ["path/to/file1", "path/to/file2", ...]}}
+Select at most 25 files. Focus on files that reveal architecture, patterns, and conventions.
+Always include root Makefile if visible in the tree.
+Exclude: test files, *_test.go, test_*.py, *.lock, *.min.js, migrations/, generated/"""
+
 # ── Init prompts ────────────────────────────────────────────────────
 
 INIT_SYSTEM = (
@@ -151,7 +183,11 @@ INIT_SYSTEM = (
     "architecture anchors, key rules. No filler. "
     "IGNORE directories named @sources, @archive, @vendor, @dev, @docs — "
     "these contain third-party or vendored code, not the project itself. "
-    "Only describe the project's own code and dependencies."
+    "Only describe the project's own code and dependencies. "
+    "ANTI-GENERIC RULE: Do NOT write generic best practices (PEP 8, ESLint, "
+    "write tests, use type hints). Every rule MUST reference actual file names, "
+    "specific libraries, or patterns visible in the code snippets. "
+    "If you can't back a rule with evidence from the snippets, omit it."
 )
 
 INIT_USER = """\
@@ -178,13 +214,10 @@ Output JSON with EXACTLY these field names:
 ## Makefile targets (real commands)
 {makefile_block}
 
-## Entry points
-{entry_points}
-
 ## Recent commits
 {commits_block}
 
-## Code snippets (first 3 lines of key files)
+## Code snippets (key files — configs, entry points, core modules)
 {snippets_block}
 
 ---
@@ -202,11 +235,12 @@ Generate:
      - Read `.claude/rules/` for project-specific coding guidelines before making changes
      - Keep CLAUDE.md under 200 lines — move detailed rules to `.claude/rules/*.md`
      - When working with external APIs, databases, browsers, or new tools — check if a relevant MCP plugin exists: use `sidecar_tasks` or browse plugins via `make -C .claude dashboard` (Plugin Browser tab). Installing the right MCP server can save significant time.
-   - ## Key Rules (5-8 bullet points specific to this project)
-2. 2-3 rules files in .claude/rules/ (e.g. ".claude/rules/testing.md") — specific to the detected tech stack. Each rule file must have 10+ lines with actionable guidelines.
+   - ## Key Rules (5-8 bullet points — MUST reference actual file names, libraries, or patterns from the snippets above. NO generic rules like "use PEP 8" or "write tests".)
+2. 2-3 rules files in .claude/rules/ (e.g. ".claude/rules/testing.md") — specific to THIS project's tech stack and patterns. Rules MUST cite specific files, classes, or patterns seen in the code snippets. Each rule file must have 10+ lines.
 
 For each file provide the path (relative to project root) and content.
 Be specific to THIS project — no generic templates.
 
 CRITICAL: Each "content" field MUST contain the FULL file content as multi-line markdown with multiple sections and paragraphs. A single title line is NOT acceptable — every file must have at least 15 lines of useful content.
-CRITICAL: Do NOT invent build/test/run commands. If no Makefile or scripts are detected, say "no build system detected" and suggest common patterns based on the tech stack."""
+CRITICAL: Do NOT invent build/test/run commands. If no Makefile or scripts are detected, say "no build system detected" and suggest common patterns based on the tech stack.
+CRITICAL: Rules must be EVIDENCE-BASED. For every rule you write, there must be a corresponding file, import, pattern, or command visible in the provided snippets. Generic boilerplate rules will be rejected."""
