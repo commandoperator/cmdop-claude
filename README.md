@@ -73,7 +73,7 @@ python -m cmdop_claude.sidecar.hook setup
 `setup` does everything in one shot:
 
 - Saves your SDKRouter API key to `~/.claude/cmdop.json` (once for all projects)
-- Registers the MCP server globally in `~/.claude.json`
+- Registers the MCP server for the current project via `claude mcp add`
 - Installs Claude Code hooks in `.claude/settings.json`
 - Configures `plansDirectory: ".claude/plans"`
 - Generates `.claude/Makefile` with convenience commands
@@ -111,7 +111,7 @@ python -m cmdop_claude.sidecar.hook unregister
 ```bash
 python -m cmdop_claude.sidecar.hook setup          # full setup (recommended)
 python -m cmdop_claude.sidecar.hook register       # MCP + hooks + Makefile
-python -m cmdop_claude.sidecar.hook unregister     # remove MCP from ~/.claude.json
+python -m cmdop_claude.sidecar.hook unregister     # remove MCP via claude mcp remove
 python -m cmdop_claude.sidecar.hook scan           # manual review
 python -m cmdop_claude.sidecar.hook status         # status JSON
 python -m cmdop_claude.sidecar.hook map-update     # debounced map
