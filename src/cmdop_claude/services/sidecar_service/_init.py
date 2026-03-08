@@ -457,7 +457,7 @@ class InitMixin(SidecarBase):
                 path = "CLAUDE.md"
             fpath = project_root / path
             fpath.parent.mkdir(parents=True, exist_ok=True)
-            fpath.write_text(f.content, encoding="utf-8")
+            fpath.write_text(f.content.strip() + "\n", encoding="utf-8")
             files_created.append(path)
 
         self._log_activity(
