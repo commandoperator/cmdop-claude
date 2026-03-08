@@ -35,8 +35,6 @@ _SKIP_DIRS = frozenset({
     "node_modules", ".venv", "venv", "__pycache__", ".mypy_cache",
     "dist", "build", ".tox", ".eggs", "*.egg-info",
     "vendor", "third_party", "3rdparty",
-    # Django/Rails/uploads — user-uploaded content often contains cloned repos
-    "media", "uploads", "storage", "public/uploads",
 })
 
 # Bot email patterns — commits from these are excluded from activity scoring
@@ -48,6 +46,10 @@ _BOT_EMAIL_RE = re.compile(
 
 # Max repos to process (safety cap for huge monorepos)
 _MAX_REPOS = 50
+
+# Max directory depth to search for .git repos (relative to root)
+# Prevents crawling into deep user-uploaded content (e.g. cloned repos in media/)
+_MAX_REPO_DEPTH = 5
 
 # LLM prompt templates
 _CLASSIFY_SYSTEM = """\
@@ -135,12 +137,18 @@ def _save_cache(cache_file: Path, key: str, ctx: GitContext) -> None:
 
 def _find_repos(root: Path) -> list[Path]:
     """Find all .git entries (file or dir) recursively, skipping junk dirs."""
+    root_depth = len(root.parts)
     repos: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(str(root)):
         current = Path(dirpath)
+        depth = len(current.parts) - root_depth
         # Check BEFORE filtering — .git is a hidden dir that we'd otherwise remove
         has_git = ".git" in dirnames or ".git" in filenames
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")]
+        # Prune descent beyond max depth
+        if depth >= _MAX_REPO_DEPTH:
+            dirnames.clear()
+        else:
+            dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")]
         if has_git:
             repos.append(current)
     # Sort shallowest first — ensures root repo (".") always survives the cap
