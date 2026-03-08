@@ -112,6 +112,7 @@ python -m cmdop_claude.sidecar.hook unregister
 | `sidecar_activity` | no | View recent action log |
 | `docs_search` | no | Full-text search across bundled + custom docs |
 | `docs_get` | no | Read a documentation file by path |
+| `docs_list` | no | List all indexed documentation files by source |
 
 All sidecar tools are called **directly** — they are not deferred tools, do not search for them via ToolSearch.
 
