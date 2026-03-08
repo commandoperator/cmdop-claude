@@ -89,16 +89,12 @@ def main() -> None:
     elif command == "init":
         _handle_init(sidecar)
 
-    elif command == "register":
+    elif command in ("register", "setup"):
         mcp_added = sidecar.register_mcp()
         if mcp_added:
             print("Registered sidecar MCP server in ~/.claude.json")
         else:
             print("MCP server already registered.")
-        # Auto-setup project hooks + init if bare
-        _setup_and_init(sidecar, config)
-
-    elif command == "setup":
         _setup_and_init(sidecar, config)
 
     elif command == "unregister":
@@ -122,8 +118,30 @@ def main() -> None:
         sys.exit(1)
 
 
+def _maybe_prompt_api_key() -> None:
+    """Interactively ask for SDKROUTER_API_KEY if not set and stdin is a TTY."""
+    from .._config import _DEFAULT_SDKROUTER_KEY, get_config
+    from ..services.sidecar_service._mcp import save_api_key
+
+    if not sys.stdin.isatty():
+        return
+    if get_config().sdkrouter_api_key != _DEFAULT_SDKROUTER_KEY:
+        return
+    print()
+    print("  SDKROUTER_API_KEY is not set — LLM features won't work.")
+    print("  Get your key at: https://sdkrouter.com")
+    try:
+        key = input("  Enter API key (Enter to skip): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return
+    if key:
+        save_api_key(key)
+        print("  Saved to ~/.claude/cmdop.json")
+
+
 def _setup_and_init(sidecar: SidecarService, config: "Config") -> None:
     """Setup project hooks and auto-init if CLAUDE.md doesn't exist."""
+    _maybe_prompt_api_key()
     hooks_added = sidecar.setup_project_hooks()
     if hooks_added:
         for h in hooks_added:

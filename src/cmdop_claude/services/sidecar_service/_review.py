@@ -11,9 +11,10 @@ from ...models.sidecar import (
     ReviewResult,
 )
 from ...sidecar.prompts import REVIEW_SYSTEM, REVIEW_USER
+from ._base import SidecarBase
 
 
-class ReviewMixin:
+class ReviewMixin(SidecarBase):
     """Documentation review: scan → LLM → review.md."""
 
     def generate_review(

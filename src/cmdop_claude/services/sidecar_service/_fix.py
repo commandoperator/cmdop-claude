@@ -3,9 +3,10 @@ import difflib
 
 from ...models.sidecar import FixResult, LLMFixResponse
 from ...sidecar.prompts import FIX_SYSTEM, FIX_USER
+from ._base import SidecarBase
 
 
-class FixMixin:
+class FixMixin(SidecarBase):
     """Generate and apply documentation fixes."""
 
     def fix_task(self, task_id: str, apply: bool = False) -> FixResult:

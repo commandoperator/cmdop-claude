@@ -3,9 +3,10 @@ import json
 from datetime import datetime, timezone
 
 from ...models.sidecar import SidecarStatus
+from ._base import SidecarBase
 
 
-class StatusMixin:
+class StatusMixin(SidecarBase):
     """Status reporting and map access."""
 
     def get_status(self) -> SidecarStatus:

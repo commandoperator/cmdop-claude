@@ -1,16 +1,28 @@
 """Configuration settings for the application."""
+import json
 import os
+from pathlib import Path
 from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from ._constants import ENV_PREFIX, DEFAULT_CLAUDE_DIR
 
 _DEFAULT_SDKROUTER_KEY = "test-api-key"
+_GLOBAL_CMDOP_CONFIG = Path.home() / ".claude" / "cmdop.json"
 
 
 def _resolve_sdkrouter_key() -> str:
-    """Read SDKROUTER_API_KEY directly (no prefix)."""
-    return os.environ.get("SDKROUTER_API_KEY", _DEFAULT_SDKROUTER_KEY)
+    """Read SDKROUTER_API_KEY: env var → ~/.claude/cmdop.json → default."""
+    if key := os.environ.get("SDKROUTER_API_KEY"):
+        return key
+    try:
+        if _GLOBAL_CMDOP_CONFIG.exists():
+            data = json.loads(_GLOBAL_CMDOP_CONFIG.read_text(encoding="utf-8"))
+            if key := data.get("sdkrouterApiKey"):
+                return key
+    except Exception:
+        pass
+    return _DEFAULT_SDKROUTER_KEY
 
 class Config(BaseSettings):
     """Application configuration with environment variable support."""

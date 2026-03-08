@@ -66,27 +66,23 @@ pip install -e ".[dev]"
 
 ## Quick Start
 
-### MCP Server (12 tools for Claude Code)
-
 ```bash
 pip install cmdop-claude
-python -m cmdop_claude.sidecar.hook register    # MCP → ~/.claude.json + hooks → .claude/settings.json
+cd your-project
+python -m cmdop_claude.sidecar.hook setup
 ```
 
-One command does everything:
-- Registers MCP server globally in `~/.claude.json`
-- Sets up project hooks in `.claude/settings.json` (map-update on Write/Edit, inject-tasks+auto-scan on prompt)
-- Configures `plansDirectory: ".claude/plans"` so Claude Code saves plans in the project
-- Generates `.claude/Makefile` with convenience commands (`dashboard`, `scan`, `map`, `status`, etc.)
-- Auto-runs `init` if no `CLAUDE.md` exists (generates docs + rules via LLM)
+`setup` does everything in one shot:
+- Asks for your **SDKRouter API key** on first run (saved to `~/.claude/cmdop.json` — once for all projects)
+- Registers the MCP server globally in `~/.claude.json` (12 tools available in Claude Code chat)
+- Sets up Claude Code hooks in `.claude/settings.json` (map-update on Write/Edit, inject-tasks on every prompt)
+- Configures `plansDirectory: ".claude/plans"` so Claude Code saves plans per-project
+- Generates `.claude/Makefile` with convenience commands
+- Auto-runs `init` if no `CLAUDE.md` found → generates CLAUDE.md + rules via LLM
 
-To set up another project (MCP already registered):
+Get your API key at **[sdkrouter.com](https://sdkrouter.com)** (free tier available).
 
-```bash
-python -m cmdop_claude.sidecar.hook setup        # hooks + plans + Makefile + auto-init
-```
-
-To unregister:
+### Unregister
 
 ```bash
 python -m cmdop_claude.sidecar.hook unregister
@@ -187,15 +183,34 @@ Python path is auto-detected via `sys.executable` — works across venvs, conda,
 
 ## Configuration
 
+### API Key
+
+The key is read in this order:
+
+1. `SDKROUTER_API_KEY` env var
+2. `~/.claude/cmdop.json` → `sdkrouterApiKey` (saved by `setup`/`register`)
+3. Falls back to no-op (LLM features silently skip)
+
+To set manually:
+```bash
+# Option A: env var (per-session)
+export SDKROUTER_API_KEY=your-key
+
+# Option B: global config (persistent, all projects)
+echo '{"sdkrouterApiKey": "your-key"}' > ~/.claude/cmdop.json
+```
+
+### Environment variables
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SDKROUTER_API_KEY` | — | **Required** for LLM features. Get at [sdkrouter.com](https://sdkrouter.com) |
+| `SDKROUTER_API_KEY` | — | LLM backend key (see above) |
 | `CMDOP_CLAUDE_DIR_PATH` | `.claude` | Path to .claude directory |
 | `CLAUDE_CP_SIDECAR_MODEL` | `deepseek/deepseek-v3.2` | LLM model for review/fix/map |
 | `CLAUDE_CP_SMITHERY_API_KEY` | — | Smithery registry API key (optional) |
 | `CMDOP_DEBUG_MODE` | `false` | Debug logging |
 
-LLM features (review, fix, map, init) require a `SDKROUTER_API_KEY` — get one at **[sdkrouter.com](https://sdkrouter.com)**. Init uses `Model.balanced(json=True)` from SDKRouter (auto-selects best model for structured output). Review, fix, and map use DeepSeek V3.2 (cheap, fast, good for short responses).
+Init uses `Model.balanced(json=True)` from SDKRouter (auto-selects best model for structured output). Review, fix, and map use DeepSeek V3.2 (cheap, fast, good for short responses).
 
 ## File Layout
 
@@ -288,16 +303,6 @@ Full cycle: **~$0.003**. Daily estimate: **~$0.003/day** (auto-scan + occasional
 make test   # 272+ tests
 ```
 
-## Development
-
-```bash
-make patch          # 0.1.0 → 0.1.1
-make minor          # 0.1.0 → 0.2.0
-make build          # sdist + wheel
-make publish        # upload to PyPI
-make publish-test   # upload to TestPyPI
-make install-global # pip install -e . (local dev)
-```
 
 ## License
 

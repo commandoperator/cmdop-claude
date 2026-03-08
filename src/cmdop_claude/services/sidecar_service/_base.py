@@ -4,10 +4,14 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-
+from typing import TYPE_CHECKING
 import logging
 
 from sdkrouter import SDKRouter
+
+if TYPE_CHECKING:
+    from ...sidecar.mapper import ProjectMapper
+    from ...sidecar.tasks import TaskManager
 from sdkrouter._constants import HOMEPAGE_URL
 
 from ..._config import Config
@@ -46,7 +50,7 @@ class SidecarBase(BaseService):
         self._usage_file = self._sidecar_dir / "usage.json"
         self._suppress_file = self._sidecar_dir / "suppressed.json"
         if not config.sdkrouter_api_key or config.sdkrouter_api_key == "test-api-key":
-            logger.warning("SDKROUTER_API_KEY not set. %s", _SDKROUTER_HELP)
+            logger.debug("SDKROUTER_API_KEY not set. %s", _SDKROUTER_HELP)
         self._sdk = SDKRouter(api_key=config.sdkrouter_api_key)
         self._model = config.sidecar_model
         self._mapper: "ProjectMapper | None" = None

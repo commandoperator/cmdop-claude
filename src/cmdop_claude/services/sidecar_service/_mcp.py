@@ -2,13 +2,30 @@
 import json
 from pathlib import Path
 
+from ._base import SidecarBase
+
+_CMDOP_CONFIG = Path.home() / ".claude" / "cmdop.json"
+
 
 def _global_claude_json() -> Path:
     """Return path to ~/.claude.json."""
     return Path.home() / ".claude.json"
 
 
-class MCPMixin:
+def save_api_key(key: str) -> None:
+    """Save SDKROUTER_API_KEY to ~/.claude/cmdop.json."""
+    _CMDOP_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    data: dict = {}
+    if _CMDOP_CONFIG.exists():
+        try:
+            data = json.loads(_CMDOP_CONFIG.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    data["sdkrouterApiKey"] = key
+    _CMDOP_CONFIG.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+class MCPMixin(SidecarBase):
     """Register/unregister sidecar MCP server in global ~/.claude.json."""
 
     def register_mcp(self) -> bool:
@@ -76,11 +93,18 @@ class MCPMixin:
 
         # PostToolUse: map-update on Write|Edit
         post_hooks = hooks.get("PostToolUse", [])
-        has_map = any("map-update" in (h.get("command", "") if isinstance(h, dict) else "") for h in post_hooks)
+        has_map = any(
+            "map-update" in cmd
+            for h in post_hooks if isinstance(h, dict)
+            for cmd in (
+                [h.get("command", "")] +
+                [hh.get("command", "") for hh in h.get("hooks", []) if isinstance(hh, dict)]
+            )
+        )
         if not has_map:
             post_hooks.append({
                 "matcher": "Write|Edit",
-                "command": "python -m cmdop_claude.sidecar.hook map-update",
+                "hooks": [{"type": "command", "command": "python -m cmdop_claude.sidecar.hook map-update"}],
             })
             hooks["PostToolUse"] = post_hooks
             created.append("PostToolUse → map-update")
@@ -88,10 +112,18 @@ class MCPMixin:
 
         # UserPromptSubmit: inject-tasks
         user_hooks = hooks.get("UserPromptSubmit", [])
-        has_inject = any("inject-tasks" in (h.get("command", "") if isinstance(h, dict) else "") for h in user_hooks)
+        has_inject = any(
+            "inject-tasks" in cmd
+            for h in user_hooks if isinstance(h, dict)
+            for cmd in (
+                [h.get("command", "")] +
+                [hh.get("command", "") for hh in h.get("hooks", []) if isinstance(hh, dict)]
+            )
+        )
         if not has_inject:
             user_hooks.append({
-                "command": "python -m cmdop_claude.sidecar.hook inject-tasks",
+                "matcher": "",
+                "hooks": [{"type": "command", "command": "python -m cmdop_claude.sidecar.hook inject-tasks"}],
             })
             hooks["UserPromptSubmit"] = user_hooks
             created.append("UserPromptSubmit → inject-tasks")

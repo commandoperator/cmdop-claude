@@ -3,9 +3,10 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from ...models.sidecar import ReviewItem
+from ._base import SidecarBase
 
 
-class TasksMixin:
+class TasksMixin(SidecarBase):
     """Task CRUD operations."""
 
     def list_tasks(self, status: Optional[str] = None) -> list:
