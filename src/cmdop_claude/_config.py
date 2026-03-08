@@ -1,31 +1,40 @@
-"""Configuration settings for the application."""
-import json
+"""Application configuration — env vars override ~/.claude/cmdop.json."""
 import os
 from pathlib import Path
 from typing import Optional
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from ._constants import ENV_PREFIX, DEFAULT_CLAUDE_DIR
+from .models.cmdop_config import CmdopConfig
 
-_DEFAULT_SDKROUTER_KEY = "test-api-key"
-_GLOBAL_CMDOP_CONFIG = Path.home() / ".claude" / "cmdop.json"
+# Loaded once at import time — cheap (just reads one JSON file)
+_cmdop: CmdopConfig = CmdopConfig.load()
 
 
-def _resolve_sdkrouter_key() -> str:
-    """Read SDKROUTER_API_KEY: env var → ~/.claude/cmdop.json → default."""
-    if key := os.environ.get("SDKROUTER_API_KEY"):
-        return key
-    try:
-        if _GLOBAL_CMDOP_CONFIG.exists():
-            data = json.loads(_GLOBAL_CMDOP_CONFIG.read_text(encoding="utf-8"))
-            if key := data.get("sdkrouterApiKey"):
-                return key
-    except Exception:
-        pass
-    return _DEFAULT_SDKROUTER_KEY
+def _default_sdkrouter_key() -> str:
+    """env var → cmdop.json → empty string (LLM features silently skip)."""
+    return os.environ.get("SDKROUTER_API_KEY") or _cmdop.sdkrouter_api_key or ""
+
+
+def _default_smithery_key() -> str:
+    return os.environ.get("CLAUDE_CP_SMITHERY_API_KEY") or _cmdop.smithery_api_key or ""
+
+
+def _default_sidecar_model() -> str:
+    return os.environ.get("CLAUDE_CP_SIDECAR_MODEL") or _cmdop.sidecar_model
+
+
+def _default_debug() -> bool:
+    env = os.environ.get("CMDOP_DEBUG_MODE", "")
+    if env:
+        return env.lower() in ("1", "true", "yes")
+    return _cmdop.debug_mode
+
 
 class Config(BaseSettings):
-    """Application configuration with environment variable support."""
+    """Runtime configuration. Env vars always win over cmdop.json defaults."""
 
     model_config = SettingsConfigDict(
         env_prefix=ENV_PREFIX,
@@ -35,33 +44,56 @@ class Config(BaseSettings):
 
     claude_dir_path: str = Field(
         default=DEFAULT_CLAUDE_DIR,
-        description="Path to the .claude directory",
+        description="Path to the .claude directory (project-local)",
     )
-    debug_mode: bool = False
+    debug_mode: bool = Field(default_factory=_default_debug)
     sdkrouter_api_key: str = Field(
-        default_factory=_resolve_sdkrouter_key,
-        description="API key for SDKRouter (sidecar LLM backend)",
+        default_factory=_default_sdkrouter_key,
+        description="API key for SDKRouter",
     )
     sidecar_model: str = Field(
-        default="deepseek/deepseek-v3.2",
-        description="Model ID for sidecar LLM calls (SDKRouter format)",
+        default_factory=_default_sidecar_model,
+        description="Model ID for sidecar LLM calls",
     )
     smithery_api_key: str = Field(
-        default="",
-        description="API key for Smithery registry (optional, skip if empty)",
+        default_factory=_default_smithery_key,
+        description="Smithery registry API key (optional)",
     )
+
+    # Global dir — can be overridden via env var CLAUDE_CP_GLOBAL_DIR
+    global_dir_override: str = Field(
+        default="",
+        description="Override global cache dir (default: ~/.claude/cmdop/)",
+    )
+
+    @property
+    def cmdop(self) -> CmdopConfig:
+        """Access to the full typed cmdop.json model."""
+        return _cmdop
+
+    @property
+    def global_dir(self) -> Path:
+        """Global cmdop-claude cache directory."""
+        if self.global_dir_override:
+            return Path(self.global_dir_override).expanduser()
+        return _cmdop.paths.global_dir
+
+    @property
+    def plugins_cache_path(self) -> Path:
+        return self.global_dir / "plugins_cache.json"
+
 
 _config: Optional[Config] = None
 
+
 def get_config() -> Config:
-    """Get current configuration (creates from env if not set)."""
     global _config
     if _config is None:
         _config = Config()
     return _config
 
-def configure(**kwargs) -> Config:
-    """Set configuration explicitly."""
+
+def configure(**kwargs: object) -> Config:
     global _config
     _config = Config.model_validate(kwargs)
     return _config

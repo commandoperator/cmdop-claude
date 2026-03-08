@@ -32,10 +32,10 @@ class PluginService(BaseService):
 
     def __init__(self, config: Config) -> None:
         super().__init__(config)
-        # Global cache — MCP plugins are installed to ~/.claude.json, not per-project
-        global_cache_dir = Path.home() / ".claude" / "cmdop"
-        global_cache_dir.mkdir(parents=True, exist_ok=True)
-        self._cache_path = global_cache_dir / "plugins_cache.json"
+        # Global cache — MCP plugins install to ~/.claude.json, not per-project
+        cache_path = config.plugins_cache_path
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        self._cache_path = cache_path
         self._index_lock = threading.Lock()
         self._index_thread: Optional[threading.Thread] = None
         # Start background index fetch if cache is missing or expired

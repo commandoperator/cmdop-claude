@@ -120,12 +120,12 @@ def main() -> None:
 
 def _maybe_prompt_api_key() -> None:
     """Interactively ask for SDKROUTER_API_KEY if not set and stdin is a TTY."""
-    from .._config import _DEFAULT_SDKROUTER_KEY, get_config
-    from ..services.sidecar_service._mcp import save_api_key
+    from .._config import get_config
+    from ..models.cmdop_config import CmdopConfig
 
     if not sys.stdin.isatty():
         return
-    if get_config().sdkrouter_api_key != _DEFAULT_SDKROUTER_KEY:
+    if get_config().sdkrouter_api_key:
         return
     print()
     print("  SDKROUTER_API_KEY is not set — LLM features won't work.")
@@ -135,7 +135,7 @@ def _maybe_prompt_api_key() -> None:
     except (EOFError, KeyboardInterrupt):
         return
     if key:
-        save_api_key(key)
+        CmdopConfig.load().set_api_key(key)
         print("  Saved to ~/.claude/cmdop.json")
 
 

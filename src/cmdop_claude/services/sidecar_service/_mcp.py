@@ -3,8 +3,7 @@ import json
 from pathlib import Path
 
 from ._base import SidecarBase
-
-_CMDOP_CONFIG = Path.home() / ".claude" / "cmdop.json"
+from ...models.cmdop_config import CmdopConfig
 
 
 def _global_claude_json() -> Path:
@@ -13,16 +12,8 @@ def _global_claude_json() -> Path:
 
 
 def save_api_key(key: str) -> None:
-    """Save SDKROUTER_API_KEY to ~/.claude/cmdop.json."""
-    _CMDOP_CONFIG.parent.mkdir(parents=True, exist_ok=True)
-    data: dict = {}
-    if _CMDOP_CONFIG.exists():
-        try:
-            data = json.loads(_CMDOP_CONFIG.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    data["sdkrouterApiKey"] = key
-    _CMDOP_CONFIG.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    """Save SDKROUTER_API_KEY to ~/.claude/cmdop.json via CmdopConfig."""
+    CmdopConfig.load().set_api_key(key)
 
 
 class MCPMixin(SidecarBase):

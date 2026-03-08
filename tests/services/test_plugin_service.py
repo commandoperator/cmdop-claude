@@ -13,10 +13,15 @@ from cmdop_claude.services.plugin_service import PluginService, _OFFICIAL_INDEX_
 
 
 def _make_service(tmp_path: Path, **kwargs):
-    """Create a PluginService with background fetch disabled."""
+    """Create a PluginService with background fetch disabled and isolated cache."""
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir(exist_ok=True)
-    defaults = {"claude_dir_path": str(claude_dir), "smithery_api_key": "test-key"}
+    defaults = {
+        "claude_dir_path": str(claude_dir),
+        "smithery_api_key": "test-key",
+        # Isolate global cache to tmp_path — prevents reading real ~/.claude/cmdop/
+        "global_dir_override": str(tmp_path / "global"),
+    }
     defaults.update(kwargs)
     config = Config(**defaults)
     with patch.object(PluginService, "_maybe_start_index_fetch"):
