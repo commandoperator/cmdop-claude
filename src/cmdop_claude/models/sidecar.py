@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, NonNegativeInt
+from pydantic import BaseModel, Field, NonNegativeInt, field_validator
 
 from .base import CoreModel
 
@@ -107,6 +107,11 @@ class LLMDirSummary(BaseModel):
     tech_stack: list[str] = Field(default_factory=list, description="Detected technologies")
     key_files: list[str] = Field(default_factory=list, description="Important files: entry points, configs")
     commands: list[str] = Field(default_factory=list, description="Detected make targets or run scripts")
+
+    @field_validator("tech_stack", "key_files", "commands", mode="before")
+    @classmethod
+    def coerce_none_to_list(cls, v: object) -> list:
+        return v if isinstance(v, list) else []
 
 
 class LLMTreeChunkResponse(BaseModel):
