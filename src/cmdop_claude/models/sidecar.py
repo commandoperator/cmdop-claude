@@ -90,6 +90,32 @@ class ReviewResult(CoreModel):
     model_used: str = Field(min_length=1)
 
 
+# ── Tree summarizer models ────────────────────────────────────────────
+
+
+class DirRole(str, Enum):
+    own = "own"
+    external = "external"
+    vendor = "vendor"
+
+
+class LLMDirSummary(BaseModel):
+    """Summary of a single directory — structured output from pre-summarizer."""
+
+    path: str = Field(description="Directory path relative to project root")
+    role: DirRole = Field(description="own=project code, external=vendored/archived, vendor=dependencies")
+    tech_stack: list[str] = Field(default_factory=list, description="Detected technologies")
+    key_files: list[str] = Field(default_factory=list, description="Important files: entry points, configs")
+    commands: list[str] = Field(default_factory=list, description="Detected make targets or run scripts")
+
+
+class LLMTreeChunkResponse(BaseModel):
+    """LLM response for a chunk of directories."""
+
+    dirs: list[LLMDirSummary]
+    project_type: str = Field(default="unknown", description="monorepo | single-app | library | unknown")
+
+
 # ── Fix/Init structured output models ────────────────────────────────
 
 

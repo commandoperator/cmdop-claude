@@ -5,6 +5,8 @@ from sdkrouter import Model
 
 from ...models.sidecar import InitResult, LLMInitResponse
 from ...sidecar.prompts import INIT_SYSTEM, INIT_USER
+from ...sidecar.tree_summarizer import TreeSummarizer
+from ._base import SidecarBase
 
 # Files that signal a project root or subproject
 _PROJECT_MARKERS = {
@@ -26,6 +28,47 @@ _CODE_EXTENSIONS = frozenset({
     ".py", ".ts", ".js", ".tsx", ".jsx", ".go", ".rs", ".java", ".rb",
     ".toml", ".yaml", ".yml", ".json", ".sh", ".mjs", ".cjs",
 })
+
+
+def _classify_top_dirs(root: Path) -> str:
+    """Classify top-level dirs as [own] or [external] based on nested project markers.
+
+    A directory is [external] if it contains its own pyproject.toml/package.json/etc.
+    at depth 1-2 — meaning it's a separate project (submodule, vendored lib, archive).
+    Everything else is [own].
+    """
+    lines: list[str] = []
+    try:
+        entries = sorted(root.iterdir())
+    except (PermissionError, OSError):
+        return ""
+
+    for entry in entries:
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        # Check if this dir contains its own project config (= external)
+        is_external = False
+        try:
+            for child in entry.iterdir():
+                if child.is_file() and child.name in _PROJECT_MARKERS:
+                    is_external = True
+                    break
+            if not is_external:
+                # Check one level deeper
+                for child in entry.iterdir():
+                    if child.is_dir():
+                        for grandchild in child.iterdir():
+                            if grandchild.is_file() and grandchild.name in _PROJECT_MARKERS:
+                                is_external = True
+                                break
+                    if is_external:
+                        break
+        except (PermissionError, OSError):
+            pass
+        tag = "[external]" if is_external else "[own]"
+        lines.append(f"{entry.name}/ {tag}")
+
+    return "\n".join(lines)
 
 
 def _read_readme(root: Path, max_chars: int = 600) -> str:
@@ -146,7 +189,7 @@ def _find_entry_points(root: Path, max_depth: int = 5) -> str:
     return "\n".join(entries) if entries else "none detected"
 
 
-def _build_smart_snippets(root: Path, max_snippets: int = 20) -> str:
+def _build_smart_snippets(root: Path, max_snippets: int = 20, allowed_top_dirs: set[str] | None = None) -> str:
     """Build code snippets prioritized by importance, not alphabetical order.
 
     Priority order:
@@ -184,6 +227,13 @@ def _build_smart_snippets(root: Path, max_snippets: int = 20) -> str:
         dirs = scan_project_dirs(root, max_depth=5, max_dirs=50)
     except Exception:
         return ""
+
+    # Filter to allowed top-level dirs if provided (from tree summarizer)
+    if allowed_top_dirs:
+        dirs = [
+            d for d in dirs
+            if d.path == "." or d.path.split("/")[0] in allowed_top_dirs
+        ]
 
     # Pass 1: project configs (pyproject.toml, package.json, etc.)
     for d in dirs:
@@ -286,7 +336,7 @@ def _build_fallback_claude_md(
     return "\n".join(lines)
 
 
-class InitMixin:
+class InitMixin(SidecarBase):
     """Project initialization — generate CLAUDE.md + rules from scan."""
 
     def init_project(self) -> InitResult:
@@ -305,14 +355,9 @@ class InitMixin:
 
         scan_result = self.scan()
         deps_block = ", ".join(scan_result.dependencies) or "(none detected)"
-        dirs_block = ", ".join(scan_result.top_dirs) or "(none)"
         commits_block = "\n".join(scan_result.recent_commits[:10]) or "(no git history)"
 
-        # Smart context gathering
-        entry_points = _find_entry_points(project_root)
         readme_block = _read_readme(project_root)
-        makefile_block = _find_makefiles(project_root)
-        snippets_block = _build_smart_snippets(project_root)
 
         # Discover monorepo structure
         configs = _find_all_project_configs(project_root)
@@ -324,9 +369,61 @@ class InitMixin:
                 parts.append(f"**{cfg['path']}**:\n{excerpt}")
             pyproject_block = "\n\n".join(parts)
 
+        # --- Phase 1: Git context — classify own vs external repos ---
+        # GitContextService finds all .git repos recursively and classifies each
+        # via LLM. Returns own_top_dirs: set[str] — only dirs with active human commits.
+        own_dirs: set[str] | None = None
+        git_ctx_block = ""
+        try:
+            from ...sidecar.git_context import GitContextService
+            git_ctx = GitContextService(self._sdk).collect(
+                project_root, claude_dir=self._claude_dir
+            )
+            if git_ctx.own_top_dirs:
+                own_dirs = git_ctx.own_top_dirs
+            git_ctx_block = git_ctx.to_prompt_block()
+        except Exception:
+            pass  # graceful fallback — continue without git context
+
+        # --- Phase 2: Smart context gathering (filtered to own dirs) ---
+        snippets_block = _build_smart_snippets(project_root, allowed_top_dirs=own_dirs)
+        entry_points = _find_entry_points(project_root)
+        makefile_block = _find_makefiles(project_root)
+
+        # dirs_block for fallback (no-LLM path)
+        dirs_block = _classify_top_dirs(project_root) or ", ".join(scan_result.top_dirs) or "(none)"
+
+        # --- Phase 3: Tree pre-summarizer — chunked parallel LLM calls ---
+        # Triggered when snippets_block is large (big/monorepo projects).
+        # When own_dirs is provided (from GitContextService), only own dirs are summarized.
+        # Merkle cache skips LLM for unchanged directories.
+        summarizer = TreeSummarizer(self._sdk)
+        tree_summary_block = ""
+        if summarizer.should_summarize(snippets_block):
+            try:
+                from ...sidecar.merkle_cache import MerkleCache
+                _cache_path = self._claude_dir / ".sidecar" / "merkle_cache.json"
+                _model_id = Model.cheap(json=True)
+                _merkle_cache = MerkleCache(_cache_path, _model_id)
+
+                summaries = summarizer.summarize(
+                    project_root, own_dirs=own_dirs, cache=_merkle_cache
+                )
+                tree_summary_block = summarizer.to_prompt_block(summaries)
+                # If GitContextService didn't run, derive own_dirs from TreeSummarizer
+                if own_dirs is None:
+                    own_dirs = {s.path for s in summaries if s.role.value == "own"}
+                if own_dirs:
+                    snippets_block = _build_smart_snippets(
+                        project_root, allowed_top_dirs=own_dirs
+                    )
+            except Exception:
+                pass  # fallback: use raw snippets as-is
+
         user_msg = INIT_USER.format(
             deps_block=deps_block,
-            dirs_block=dirs_block,
+            git_repos_block=git_ctx_block or "(no git repos found)",
+            tree_summary_block=tree_summary_block or f"\n{dirs_block}",
             commits_block=commits_block,
             entry_points=entry_points,
             readme_block=readme_block or "(no README)",
@@ -345,7 +442,7 @@ class InitMixin:
         parsed = None
         tokens_used = 0
         model_used = "unknown"
-        for _attempt in range(3):
+        for _ in range(3):
             try:
                 response = self._sdk.parse(
                     model=Model.balanced(json=True),

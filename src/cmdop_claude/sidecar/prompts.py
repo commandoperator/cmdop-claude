@@ -111,6 +111,34 @@ If creating a new file, write only what's needed.
 
 IMPORTANT: Return ONLY the file content in the "content" field. No markdown fences, no explanations."""
 
+# ── Tree summarizer prompts ──────────────────────────────────────────
+
+TREE_CHUNK_SYSTEM = (
+    "You are a project structure analyst. "
+    "Classify directories as own project code vs external/vendored/archived code. "
+    "Be strict: only mark as 'own' if it is clearly part of this project's source. "
+    "Directories named @archive, @sources, @vendor, or containing their own "
+    "pyproject.toml/package.json/go.mod at top level are 'external' or 'vendor'."
+)
+
+TREE_CHUNK_USER = """\
+Analyze these project directories and classify each one.
+
+Output JSON with EXACTLY these field names:
+- Top-level: "dirs" (array), "project_type" (string: monorepo | single-app | library | unknown)
+- Each dir: "path", "role", "tech_stack", "key_files", "commands"
+- "role" must be one of: "own" | "external" | "vendor"
+- When uncertain about role → use "external" (conservative default)
+
+## Directories with file listings
+{dirs_block}
+
+For each directory provide:
+- role: "own" (project source code), "external" (archived/vendored foreign project), "vendor" (dependency cache)
+- tech_stack: detected technologies only (Python, Django, React, Go, etc.) — omit if unsure
+- key_files: entry points and important config files (max 5)
+- commands: detected Makefile targets or run scripts (max 5)"""
+
 # ── Init prompts ────────────────────────────────────────────────────
 
 INIT_SYSTEM = (
@@ -120,11 +148,18 @@ INIT_SYSTEM = (
     "README, Makefile targets, dependencies. Never invent commands or tools "
     "that are not evidenced in the input. "
     "CLAUDE.md must be under 100 lines: tech stack, build/test commands, "
-    "architecture anchors, key rules. No filler."
+    "architecture anchors, key rules. No filler. "
+    "IGNORE directories named @sources, @archive, @vendor, @dev, @docs — "
+    "these contain third-party or vendored code, not the project itself. "
+    "Only describe the project's own code and dependencies."
 )
 
 INIT_USER = """\
 Generate initial .claude/ documentation for this project.
+
+Output JSON with EXACTLY these field names:
+- "files" (array of objects), each with "path" (string) and "content" (string)
+- "path" for CLAUDE.md must be exactly "CLAUDE.md" (NOT ".claude/CLAUDE.md")
 
 ## Project metadata (from pyproject.toml)
 {pyproject_block}
@@ -135,8 +170,10 @@ Generate initial .claude/ documentation for this project.
 ## Dependencies
 {deps_block}
 
-## Top directories
-{dirs_block}
+## Git repositories (own vs external)
+{git_repos_block}
+
+## Project structure (pre-analyzed){tree_summary_block}
 
 ## Makefile targets (real commands)
 {makefile_block}
@@ -172,8 +209,4 @@ For each file provide the path (relative to project root) and content.
 Be specific to THIS project — no generic templates.
 
 CRITICAL: Each "content" field MUST contain the FULL file content as multi-line markdown with multiple sections and paragraphs. A single title line is NOT acceptable — every file must have at least 15 lines of useful content.
-CRITICAL: Do NOT invent build/test/run commands. If no Makefile or scripts are detected, say "no build system detected" and suggest common patterns based on the tech stack.
-
-IMPORTANT: Use EXACTLY these JSON field names:
-- "files" (array of objects)
-- Each file: "path" (string), "content" (string)"""
+CRITICAL: Do NOT invent build/test/run commands. If no Makefile or scripts are detected, say "no build system detected" and suggest common patterns based on the tech stack."""
