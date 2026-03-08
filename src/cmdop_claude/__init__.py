@@ -9,4 +9,8 @@ __all__ = [
     "Client",
 ]
 
-__version__ = "0.1.0"
+try:
+    from importlib.metadata import version
+    __version__ = version("cmdop-claude")
+except Exception:
+    __version__ = "unknown"
