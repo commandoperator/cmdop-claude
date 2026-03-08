@@ -116,7 +116,9 @@ def _find_all_project_configs(root: Path, max_depth: int = 5) -> list[dict]:
     return configs
 
 
-def _find_makefiles(root: Path, max_depth: int = 4) -> str:
+def _find_makefiles(
+    root: Path, max_depth: int = 4, allowed_top_dirs: set[str] | None = None
+) -> str:
     """Find Makefiles anywhere in the tree — extract targets with path context."""
     from ...sidecar.exclusions import should_exclude_dir, load_gitignore
 
@@ -126,6 +128,11 @@ def _find_makefiles(root: Path, max_depth: int = 4) -> str:
     def _walk(current: Path, depth: int, rel: str) -> None:
         if depth > max_depth:
             return
+        # At depth=1 (top-level dirs), filter to own dirs when provided
+        if depth == 1 and allowed_top_dirs is not None:
+            top = rel.split("/")[0]
+            if top not in allowed_top_dirs:
+                return
         try:
             entries = sorted(current.iterdir())
         except (PermissionError, OSError):
@@ -154,7 +161,9 @@ def _find_makefiles(root: Path, max_depth: int = 4) -> str:
     return "\n".join(all_targets[:10]) if all_targets else ""
 
 
-def _find_entry_points(root: Path, max_depth: int = 5) -> str:
+def _find_entry_points(
+    root: Path, max_depth: int = 5, allowed_top_dirs: set[str] | None = None
+) -> str:
     """Find entry points deep in the tree — not just top 2 levels."""
     from ...sidecar.exclusions import should_exclude_dir, load_gitignore
 
@@ -164,6 +173,11 @@ def _find_entry_points(root: Path, max_depth: int = 5) -> str:
     def _walk(current: Path, depth: int, rel: str) -> None:
         if depth > max_depth or len(entries) >= 20:
             return
+        # At depth=1 (top-level dirs), filter to own dirs when provided
+        if depth == 1 and allowed_top_dirs is not None:
+            top = rel.split("/")[0]
+            if top not in allowed_top_dirs:
+                return
         try:
             items = sorted(current.iterdir())
         except (PermissionError, OSError):
@@ -298,6 +312,12 @@ def _build_fallback_claude_md(
             lines.append(f"- `{mk_line.strip()}`")
         lines.append("")
 
+    # README excerpt in architecture section
+    if readme:
+        lines.append("## Overview")
+        lines.append(readme[:300].strip())
+        lines.append("")
+
     # Architecture from dirs + entry points
     lines.append("## Architecture")
     if dirs and dirs != "(none)":
@@ -387,8 +407,8 @@ class InitMixin(SidecarBase):
 
         # --- Phase 2: Smart context gathering (filtered to own dirs) ---
         snippets_block = _build_smart_snippets(project_root, allowed_top_dirs=own_dirs)
-        entry_points = _find_entry_points(project_root)
-        makefile_block = _find_makefiles(project_root)
+        entry_points = _find_entry_points(project_root, allowed_top_dirs=own_dirs)
+        makefile_block = _find_makefiles(project_root, allowed_top_dirs=own_dirs)
 
         # dirs_block for fallback (no-LLM path)
         dirs_block = _classify_top_dirs(project_root) or ", ".join(scan_result.top_dirs) or "(none)"

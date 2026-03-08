@@ -195,6 +195,29 @@ def test_git_context_to_prompt_block_empty() -> None:
     assert "no git repos" in block
 
 
+def test_repo_info_author_count_default() -> None:
+    info = RepoInfo(path=".")
+    assert info.author_count == 0
+
+
+def test_repo_info_author_count_stored() -> None:
+    info = RepoInfo(path=".", author_count=5)
+    assert info.author_count == 5
+
+
+def test_repo_info_cache_roundtrip_preserves_author_count(tmp_path: Path) -> None:
+    ctx = GitContext(
+        repos=[RepoInfo(path=".", has_commits=True, author_count=3)],
+        classifications=[LLMRepoClassification(path=".", role=RepoRole.own, reason="root")],
+        own_top_dirs={"src"},
+    )
+    cache_file = tmp_path / "git_ctx.json"
+    _save_cache(cache_file, "key1", ctx)
+    loaded = _load_cache(cache_file, "key1")
+    assert loaded is not None
+    assert loaded.repos[0].author_count == 3
+
+
 def test_git_context_to_prompt_block_with_repos() -> None:
     ctx = GitContext(
         repos=[

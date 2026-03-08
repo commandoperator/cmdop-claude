@@ -58,6 +58,7 @@ Hard rules (apply before reasoning):
 - remote matches well-known OSS projects (django, react, stripe, kubernetes, etc.) → "external"
 - same GitHub org/user as root AND has recent commits → "own-submodule"
 - no remote + path looks like a project module → "own-submodule"
+- author_count > 10 → strong signal of external/OSS project
 
 When uncertain → return "external". Be conservative.
 """
@@ -70,6 +71,7 @@ Classify this repository:
   remote: {remote_url}
   last commit: {last_commit}
   active dirs (recent 90d): {active_dirs}
+  unique human authors (recent 30 commits): {author_count}
 
 Respond with JSON: {{"path": "{path}", "role": "own|own-submodule|external", "reason": "one sentence"}}
 """
@@ -171,7 +173,20 @@ def _inspect_sync(repo_path: Path, root: Path) -> RepoInfo:
         except Exception:
             pass
 
+        # Author diversity: count unique human authors in recent commits.
+        # Works even for shallow clones — provides ownership signal without
+        # needing full history. High author count → likely external/OSS project.
+        unique_authors: set[str] = set()
+        try:
+            for commit in repo.iter_commits(max_count=30):
+                author_email = getattr(commit.author, "email", "") or ""
+                if not _BOT_EMAIL_RE.search(author_email):
+                    unique_authors.add(author_email.lower())
+        except Exception:
+            pass
+
         # Active dirs: last 90 days OR 50 commits, skip bot commits
+        # Skip file-level stats for shallow clones (stats are expensive and unreliable)
         active_files: set[str] = set()
         if not is_shallow:
             cutoff = datetime.now() - timedelta(days=90)
@@ -196,6 +211,7 @@ def _inspect_sync(repo_path: Path, root: Path) -> RepoInfo:
             active_top_dirs=active_top[:20],
             has_commits=True,
             is_shallow=is_shallow,
+            author_count=len(unique_authors),
         )
     except ImportError:
         logger.debug("gitpython not installed — skipping git inspection")
@@ -227,6 +243,7 @@ def _classify_sync(sdk: "SDKRouter", info: RepoInfo, root_remote: str) -> LLMRep
         remote_url=info.remote_url or "(no remote)",
         last_commit=info.last_commit_date or "(unknown)",
         active_dirs=", ".join(info.active_top_dirs[:10]) or "(none)",
+        author_count=info.author_count,
     )
 
     for _ in range(3):

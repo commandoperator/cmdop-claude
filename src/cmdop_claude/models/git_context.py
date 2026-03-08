@@ -1,6 +1,5 @@
 """Git context models — repo ownership classification."""
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -22,6 +21,9 @@ class RepoInfo(CoreModel):
     active_top_dirs: list[str] = Field(default_factory=list)
     has_commits: bool = False
     is_shallow: bool = False
+    # Number of unique human authors in recent commits (diversity signal)
+    # Used for shallow clone resilience: even shallow clones have author data
+    author_count: int = 0
 
 
 class LLMRepoClassification(BaseModel):
