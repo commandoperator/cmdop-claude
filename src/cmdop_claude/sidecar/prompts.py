@@ -137,7 +137,9 @@ For each directory provide:
 - role: "own" (project source code), "external" (archived/vendored foreign project), "vendor" (dependency cache)
 - tech_stack: detected technologies only (Python, Django, React, Go, etc.) — omit if unsure
 - key_files: entry points and important config files (max 5)
-- commands: detected Makefile targets or run scripts (max 5)"""
+- commands: detected Makefile targets or run scripts (max 5)
+
+IMPORTANT: Never use null. Use empty array [] for tech_stack, key_files, commands when unknown."""
 
 # ── File selection prompts (Step 1 of init) ─────────────────────────
 
