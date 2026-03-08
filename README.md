@@ -1,56 +1,57 @@
 # cmdop-claude
 
-Self-maintaining `.claude/` runtime. Turns a static config folder into living project memory — LLM-powered documentation review, project map generation, task queue, auto-fix, MCP plugin management, and project initialization.
+Self-maintaining `.claude/` runtime for Claude Code. Keeps your project documentation accurate, your context lean, and your LLM session aware of what matters — automatically.
 
 ![cmdop-claude dashboard](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/plugins.png)
 
-**$0.001 per full cycle** (scan → review → fix → map) using DeepSeek V3.2 via SDKRouter.
+**~$0.003 per full cycle** (scan → review → fix → map) using DeepSeek V3.2 via SDKRouter.
+
+---
+
+## What it does
+
+Claude Code's `.claude/` folder is powerful but static. `cmdop-claude` makes it live:
+
+- **Documentation review** — LLM finds stale docs, contradictions between docs and actual code, coverage gaps, and abandoned plans. Runs automatically once per day.
+- **Project map** — annotates directories with one-sentence descriptions. Cached by SHA256; only changed dirs cost tokens.
+- **Task queue** — review findings become structured tasks (`T-001.md`, `T-002.md`, ...). Top pending items injected into every prompt automatically.
+- **Auto-fix** — LLM generates targeted file edits for any task. Preview diff or apply directly.
+- **Project init** — bootstraps `CLAUDE.md` + rules from scratch for bare projects. Smart 3-phase pipeline: git context → filtered code snippets → cached tree summaries.
+- **Plugin browser** — searches Smithery + Official MCP registries (~1000 plugins), installs to `~/.claude.json`.
+
+Everything runs as Claude Code hooks. Zero manual steps after setup.
+
+---
 
 ## How it works
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Claude Code Session                          │
-│                                                                 │
-│  UserPromptSubmit ──► inject-tasks                              │
-│                        ├─ auto-scan (if >24h since last review) │
-│                        │   ├─ LLM review of .claude/ docs+plans │
-│                        │   └─ convert issues → tasks            │
-│                        └─ print top 3 pending tasks             │
-│                                                                 │
-│  PostToolUse (Write|Edit) ──► map-update                        │
-│                                ├─ debounce (skip if <60s)       │
-│                                └─ incremental project map       │
-│                                    └─ SHA256 cache (skip LLM    │
-│                                       for unchanged dirs)       │
-│                                                                 │
-│  MCP Tools ──► sidecar_scan    → manual review trigger          │
-│            ──► sidecar_fix     → apply fix to a task            │
-│            ──► sidecar_init    → bootstrap bare project         │
-│            ──► sidecar_map     → force map regeneration         │
-│            ──► sidecar_tasks   → view/manage task queue         │
-│            ──► sidecar_activity → view action log               │
-└─────────────────────────────────────────────────────────────────┘
+UserPromptSubmit hook
+  └─ inject-tasks
+      ├─ auto-scan if >24h since last review
+      │   ├─ LLM reviews .claude/ docs, plans, deps, commits
+      │   └─ creates/updates tasks from findings
+      └─ injects top 3 pending tasks into context
+
+PostToolUse hook (Write|Edit)
+  └─ map-update (debounced 60s)
+      ├─ scans changed directories
+      ├─ SHA256 cache → skips unchanged dirs (0 tokens)
+      └─ LLM annotates new/changed dirs only
+
+sidecar_init (MCP tool / CLI)
+  ├─ Phase 1: GitContextService — finds all .git repos, classifies own vs external
+  │   └─ LLM + hard rules → own_top_dirs set
+  ├─ Phase 2: smart snippets filtered to own dirs
+  │   ├─ entry points, Makefiles, configs
+  │   └─ external dirs (@archive, @vendor, submodules) excluded
+  └─ Phase 3: TreeSummarizer with MerkleCache
+      ├─ TOON format (~60% fewer tokens than JSON)
+      ├─ Merkle hash per dir → skip LLM for unchanged
+      └─ parallel LLM chunks (asyncio)
 ```
 
-**The full automation chain:**
-
-1. **On every prompt** (`UserPromptSubmit` hook):
-   - Check if last review was >24h ago → auto-run LLM review
-   - Review finds stale docs, contradictions, gaps, abandoned plans → creates tasks
-   - Top 3 pending tasks injected into context
-
-2. **On every file edit** (`PostToolUse` hook):
-   - Debounced map update (skip if <60s since last)
-   - LLM annotates new/changed directories
-   - Unchanged dirs served from SHA256 cache (0 tokens)
-
-3. **On demand** (MCP tools / CLI):
-   - `sidecar_fix` → LLM generates targeted fix for a task
-   - `sidecar_init` → bootstraps CLAUDE.md + rules for bare projects
-   - `sidecar_acknowledge` → suppress noisy items for N days
-
-4. **Everything is logged** to `activity.jsonl` with token counts
+---
 
 ## Install
 
@@ -59,10 +60,11 @@ pip install cmdop-claude
 
 # With Streamlit dashboard
 pip install cmdop-claude[ui]
-
-# Dev
-pip install -e ".[dev]"
 ```
+
+Get your API key at **[sdkrouter.com](https://sdkrouter.com)** (free tier available).
+
+---
 
 ## Quick Start
 
@@ -73,23 +75,26 @@ python -m cmdop_claude.sidecar.hook setup
 ```
 
 `setup` does everything in one shot:
-- Asks for your **SDKRouter API key** on first run (saved to `~/.claude/cmdop.json` — once for all projects)
-- Registers the MCP server globally in `~/.claude.json` (12 tools available in Claude Code chat)
-- Sets up Claude Code hooks in `.claude/settings.json` (map-update on Write/Edit, inject-tasks on every prompt)
-- Configures `plansDirectory: ".claude/plans"` so Claude Code saves plans per-project
+
+- Saves your SDKRouter API key to `~/.claude/cmdop.json` (once for all projects)
+- Registers the MCP server globally in `~/.claude.json`
+- Installs Claude Code hooks in `.claude/settings.json`
+- Configures `plansDirectory: ".claude/plans"`
 - Generates `.claude/Makefile` with convenience commands
-- Auto-runs `init` if no `CLAUDE.md` found → generates CLAUDE.md + rules via LLM
+- Runs `init` if no `CLAUDE.md` found → generates docs via LLM
 
-Get your API key at **[sdkrouter.com](https://sdkrouter.com)** (free tier available).
-
-### Unregister
+### Uninstall
 
 ```bash
 python -m cmdop_claude.sidecar.hook unregister
 ```
 
-| Tool | LLM? | Description |
-|------|------|-------------|
+---
+
+## MCP Tools
+
+| Tool | LLM | Description |
+|------|-----|-------------|
 | `sidecar_scan` | yes | Run documentation review |
 | `sidecar_review` | no | Read current review |
 | `sidecar_status` | no | Last run, pending items, token usage |
@@ -101,62 +106,56 @@ python -m cmdop_claude.sidecar.hook unregister
 | `sidecar_task_create` | no | Create manual task |
 | `sidecar_fix` | yes | Generate fix for a task (dry-run or apply) |
 | `sidecar_init` | yes | Bootstrap `.claude/` for bare projects |
-| `sidecar_activity` | no | View recent action log (init, review, fix, map) |
+| `sidecar_activity` | no | View recent action log |
 
-### CLI
+---
+
+## CLI
 
 ```bash
-python -m cmdop_claude.sidecar.hook register             # MCP + project hooks + Makefile
-python -m cmdop_claude.sidecar.hook setup                # project hooks + Makefile only
-python -m cmdop_claude.sidecar.hook unregister           # remove MCP from ~/.claude.json
-python -m cmdop_claude.sidecar.hook scan                 # manual review
-python -m cmdop_claude.sidecar.hook status               # status JSON
-python -m cmdop_claude.sidecar.hook map-update           # debounced map
-python -m cmdop_claude.sidecar.hook inject-tasks         # auto-scan + pending tasks
+python -m cmdop_claude.sidecar.hook setup          # full setup (recommended)
+python -m cmdop_claude.sidecar.hook register       # MCP + hooks + Makefile
+python -m cmdop_claude.sidecar.hook unregister     # remove MCP from ~/.claude.json
+python -m cmdop_claude.sidecar.hook scan           # manual review
+python -m cmdop_claude.sidecar.hook status         # status JSON
+python -m cmdop_claude.sidecar.hook map-update     # debounced map
+python -m cmdop_claude.sidecar.hook inject-tasks   # auto-scan + pending tasks
 python -m cmdop_claude.sidecar.hook fix <task_id> [--apply]
-python -m cmdop_claude.sidecar.hook init                 # bootstrap .claude/
+python -m cmdop_claude.sidecar.hook init           # bootstrap .claude/
 python -m cmdop_claude.sidecar.hook acknowledge <id> [days]
 python -m cmdop_claude.sidecar.hook activity [limit]
 ```
 
-### Python API
+---
+
+## Python API
 
 ```python
 from cmdop_claude import Client
 
 client = Client()
 
-# Review → find issues
 result = client.sidecar.generate_review()
+fix    = client.sidecar.fix_task("T-001", apply=True)
+init   = client.sidecar.init_project()
+map_   = client.sidecar.generate_map()
 
-# Fix a specific task
-fix = client.sidecar.fix_task("T-001", apply=True)
-
-# Init bare project
-init = client.sidecar.init_project()
-
-# Generate project map
-project_map = client.sidecar.generate_map()
-
-# Plugin browser
 plugins = client.plugins.search("slack", source="official")
 client.plugins.install_plugin(plugins[0])
-client.plugins.get_installed_names()
 ```
 
-### Streamlit Dashboard
+---
+
+## Streamlit Dashboard
 
 ```bash
-make run   # http://localhost:8501
-# or from a project with generated Makefile:
-make -C .claude dashboard
+make run              # http://localhost:8501
+make -C .claude dashboard  # from project with generated Makefile
 ```
 
-10 tabs: Health Auditor, Skill Studio, MCP Studio, **Plugin Browser**, Hooks Manager, Sidecar Monitor, Project Map, Task Queue, Settings & Security, Trigger Graph.
+10 tabs: Health Auditor, Skill Studio, MCP Studio, Plugin Browser, Hooks Manager, Sidecar Monitor, Project Map, Task Queue, Settings & Security, Trigger Graph.
 
-**Plugin Browser** searches Smithery + Official MCP registries (~1000 plugins), with background index pre-caching and install/uninstall to `~/.claude.json`. Supports both command-based (stdio) and remote URL (streamable-http) servers.
-
-### Dashboard Screenshots
+**Plugin Browser** searches Smithery + Official MCP registries (~1000 plugins) with background index caching. Supports stdio and streamable-http servers.
 
 | | |
 |---|---|
@@ -166,121 +165,105 @@ make -C .claude dashboard
 | ![Hooks Manager](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/hooks.png) | ![Skill Studio](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/skills.png) |
 | ![Settings & Security](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/settings.png) | ![Trigger Graph](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/graph.png) |
 
-### Generated `.claude/Makefile`
-
-`register` / `setup` generates a convenience Makefile in each project:
-
-```bash
-make -C .claude dashboard   # Streamlit UI
-make -C .claude scan        # Run review
-make -C .claude map         # Update project map
-make -C .claude status      # Show status
-make -C .claude activity    # View action log
-make -C .claude init        # Bootstrap project
-```
-
-Python path is auto-detected via `sys.executable` — works across venvs, conda, homebrew, etc.
+---
 
 ## Configuration
 
 ### API Key
 
-The key is read in this order:
+Read in this order:
 
 1. `SDKROUTER_API_KEY` env var
-2. `~/.claude/cmdop.json` → `sdkrouterApiKey` (saved by `setup`/`register`)
-3. Falls back to no-op (LLM features silently skip)
+2. `~/.claude/cmdop.json` → `sdkrouterApiKey` (written by `setup`)
+3. Falls back silently — LLM features skip, read-only tools still work
 
-To set manually:
 ```bash
-# Option A: env var (per-session)
 export SDKROUTER_API_KEY=your-key
-
-# Option B: global config (persistent, all projects)
+# or
 echo '{"sdkrouterApiKey": "your-key"}' > ~/.claude/cmdop.json
 ```
 
-### Environment variables
+### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SDKROUTER_API_KEY` | — | LLM backend key (see above) |
+| `SDKROUTER_API_KEY` | — | LLM backend key |
 | `CMDOP_CLAUDE_DIR_PATH` | `.claude` | Path to .claude directory |
-| `CLAUDE_CP_SIDECAR_MODEL` | `deepseek/deepseek-v3.2` | LLM model for review/fix/map |
-| `CLAUDE_CP_SMITHERY_API_KEY` | — | Smithery registry API key (optional) |
+| `CLAUDE_CP_SIDECAR_MODEL` | `deepseek/deepseek-v3.2` | Model for review/fix/map |
+| `CLAUDE_CP_SMITHERY_API_KEY` | — | Smithery registry key (optional) |
 | `CMDOP_DEBUG_MODE` | `false` | Debug logging |
 
-Init uses `Model.balanced(json=True)` from SDKRouter (auto-selects best model for structured output). Review, fix, and map use DeepSeek V3.2 (cheap, fast, good for short responses).
+Init uses `Model.balanced(json=True)` from SDKRouter (best model for structured output). Everything else uses DeepSeek V3.2 (cheap, fast).
+
+---
 
 ## File Layout
 
 ```
 .claude/
-├── CLAUDE.md                # project instructions
-├── project-map.md           # auto-generated structure map
-├── settings.json            # hooks + plansDirectory (auto-created)
-├── Makefile                 # convenience commands (auto-generated)
-├── rules/*.md               # coding rules
+├── CLAUDE.md                # project instructions (auto-generated or hand-written)
+├── project-map.md           # directory annotations (auto-updated)
+├── settings.json            # hooks + plansDirectory
+├── Makefile                 # convenience commands
+├── rules/*.md               # coding guidelines
 ├── plans/*.md               # Claude Code plans (project-local)
 └── .sidecar/                # runtime state (git-ignored)
-    ├── review.md            # latest review
+    ├── review.md            # latest review output
     ├── history/*.md         # past reviews
-    ├── tasks/T-001.md       # task queue (YAML frontmatter + md)
-    ├── map_cache.json       # annotation cache (SHA256)
+    ├── tasks/T-001.md       # task queue (YAML frontmatter + markdown)
+    ├── map_cache.json       # SHA256 annotation cache
+    ├── merkle_cache.json    # dir hash cache for init tree summarizer
+    ├── git_context.json     # own vs external repo classification cache
     ├── plugins_cache.json   # plugin registry index cache
     ├── activity.jsonl       # action log (auto-rotates at 1000 lines)
     ├── usage.json           # daily token tracking
     └── suppressed.json      # acknowledged items
 ```
 
+---
+
 ## Architecture
 
 ```
 src/cmdop_claude/
-├── _config.py                  # Pydantic Settings
-├── _client.py                  # Client (lazy service properties)
+├── _config.py                  # Pydantic Settings (env vars)
+├── _client.py                  # Client entry point (lazy service props)
 ├── models/
 │   ├── base.py                 # CoreModel (strict Pydantic v2)
-│   ├── mcp.py                  # MCPServerCommand|MCPServerURL, MCPConfig
-│   ├── plugin.py               # MCPPluginInfo, PluginCache, PluginCacheStore
-│   ├── sidecar.py              # Review, Fix, Init, ActivityEntry
-│   ├── project_map.py          # Map models
-│   └── task.py                 # Task models
+│   ├── git_context.py          # RepoInfo, GitContext, LLMRepoClassification
+│   ├── sidecar.py              # Review, Fix, Init, Map, ActivityEntry
+│   ├── project_map.py          # Map annotation models
+│   ├── task.py                 # Task queue models
+│   ├── mcp.py                  # MCPServerCommand, MCPServerURL, MCPConfig
+│   └── plugin.py               # MCPPluginInfo, PluginCache
 ├── services/
-│   ├── plugin_service.py       # Registry search, install/uninstall, background indexing
-│   ├── mcp_service.py          # MCP config read/write (project + global)
-│   └── sidecar_service/        # Decomposed into domain mixins
+│   ├── plugin_service.py       # Registry search, install, background indexing
+│   ├── mcp_service.py          # MCP config read/write
+│   └── sidecar_service/
 │       ├── _base.py            # State, lock, scan, usage, activity
-│       ├── _review.py          # LLM review + review.md
+│       ├── _review.py          # LLM review → review.md
 │       ├── _fix.py             # LLM fix for tasks
-│       ├── _init.py            # LLM project init (balanced model + fallback)
+│       ├── _init.py            # 3-phase project init pipeline
 │       ├── _tasks.py           # Task CRUD
-│       ├── _mcp.py             # MCP registration + project hooks + Makefile
+│       ├── _mcp.py             # MCP registration + hooks + Makefile
 │       └── _status.py          # Status + map access
-├── sidecar/
-│   ├── server.py               # FastMCP server (12 tools)
-│   ├── hook.py                 # CLI (11 commands, auto-scan logic)
-│   ├── scanner.py              # .claude/ filesystem scanner
-│   ├── mapper.py               # Project map generator
-│   ├── exclusions.py           # Junk filter + .gitignore
-│   ├── activity.py             # Activity logger (JSONL, auto-rotate)
-│   ├── cache.py                # SHA256 annotation cache
-│   ├── tasks.py                # Task queue manager
-│   └── prompts.py              # LLM prompt templates
-└── ui/
-    ├── main.py                 # Streamlit entry point
-    └── app/                    # Dashboard tabs (decomposed)
-        ├── __init__.py         # Main routing + sidebar menu
-        ├── _auditor.py         # Health Auditor
-        ├── _skills.py          # Skill Studio
-        ├── _mcp.py             # MCP Studio + Plugin Browser
-        ├── _hooks.py           # Hooks Manager
-        ├── _sidecar.py         # Sidecar Monitor
-        ├── _project_map.py     # Project Map
-        ├── _tasks.py           # Task Queue
-        ├── _settings.py        # Settings & Security
-        └── _graph.py           # Trigger Graph
+└── sidecar/
+    ├── server.py               # FastMCP server (12 tools)
+    ├── hook.py                 # CLI (11 commands)
+    ├── git_context.py          # GitContextService — own vs external repo classification
+    ├── tree_summarizer.py      # TreeSummarizer — chunked parallel LLM dir analysis
+    ├── toon.py                 # TOON serializer — token-efficient tree format
+    ├── merkle_cache.py         # MerkleCache — SHA256 dir hashing, skips LLM for unchanged
+    ├── mapper.py               # Project map generator
+    ├── scanner.py              # .claude/ filesystem scanner
+    ├── exclusions.py           # Junk filter + .gitignore integration
+    ├── activity.py             # Activity logger (JSONL, auto-rotate)
+    ├── cache.py                # SHA256 annotation cache for map
+    ├── tasks.py                # Task queue manager
+    └── prompts.py              # LLM prompt templates
 ```
+
+---
 
 ## Cost
 
@@ -288,21 +271,24 @@ src/cmdop_claude/
 |-----------|--------|------|
 | Documentation review | ~1800 | ~$0.0005 |
 | Fix a task | ~500 | ~$0.0001 |
-| Project init (balanced) | ~5000 | ~$0.001 |
+| Project init | ~5000 | ~$0.001 |
 | Map generation (45 dirs) | ~5000 | ~$0.001 |
-| Map incremental (cached) | 0 | $0.00 |
-| Auto-scan (1x/day) | ~1800 | ~$0.0005 |
-| Tasks / status / read | 0 | $0.00 |
-| Plugin search (cached) | 0 | $0.00 |
+| Map incremental (cached dirs) | 0 | $0.00 |
+| Init (cached dirs via MerkleCache) | 0 | $0.00 |
+| Auto-scan (1×/day) | ~1800 | ~$0.0005 |
+| Read-only operations | 0 | $0.00 |
 
-Full cycle: **~$0.003**. Daily estimate: **~$0.003/day** (auto-scan + occasional map updates).
+**Full cycle: ~$0.003. Daily estimate: ~$0.001–0.003/day.**
+
+---
 
 ## Testing
 
 ```bash
-make test   # 272+ tests
+make test   # 364+ tests
 ```
 
+---
 
 ## License
 
