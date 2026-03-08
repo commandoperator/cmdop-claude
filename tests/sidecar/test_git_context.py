@@ -64,7 +64,9 @@ def test_find_repos_respects_safety_cap(tmp_path: Path) -> None:
 # ── _merge ───────────────────────────────────────────────────────────
 
 
-def test_merge_root_repo_adds_active_dirs() -> None:
+def test_merge_root_repo_adds_active_dirs(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
     infos = [
         RepoInfo(path=".", active_top_dirs=["src", "tests"], has_commits=True),
         RepoInfo(path="external/lib", active_top_dirs=[], has_commits=True),
@@ -73,13 +75,30 @@ def test_merge_root_repo_adds_active_dirs() -> None:
         LLMRepoClassification(path=".", role=RepoRole.own, reason="root"),
         LLMRepoClassification(path="external/lib", role=RepoRole.external, reason="external"),
     ]
-    own_dirs = _merge(infos, classifications)
+    own_dirs = _merge(infos, classifications, root=tmp_path)
     assert "src" in own_dirs
     assert "tests" in own_dirs
     assert "external" not in own_dirs
 
 
-def test_merge_submodule_adds_top_dir() -> None:
+def test_merge_filters_files_from_active_dirs(tmp_path: Path) -> None:
+    """active_top_dirs may include files (e.g. .gitmodules) — filter them out."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / ".gitmodules").write_text("")  # file, not dir
+    infos = [
+        RepoInfo(path=".", active_top_dirs=["src", ".gitmodules"], has_commits=True),
+    ]
+    classifications = [
+        LLMRepoClassification(path=".", role=RepoRole.own, reason="root"),
+    ]
+    own_dirs = _merge(infos, classifications, root=tmp_path)
+    assert "src" in own_dirs
+    assert ".gitmodules" not in own_dirs
+
+
+def test_merge_submodule_adds_top_dir(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "projects").mkdir()
     infos = [
         RepoInfo(path=".", active_top_dirs=["src"], has_commits=True),
         RepoInfo(path="projects/payments", active_top_dirs=["api"], has_commits=True),
@@ -88,12 +107,13 @@ def test_merge_submodule_adds_top_dir() -> None:
         LLMRepoClassification(path=".", role=RepoRole.own, reason="root"),
         LLMRepoClassification(path="projects/payments", role=RepoRole.own_submodule, reason="same org"),
     ]
-    own_dirs = _merge(infos, classifications)
+    own_dirs = _merge(infos, classifications, root=tmp_path)
     assert "src" in own_dirs
     assert "projects" in own_dirs  # top-level dir of the submodule
 
 
-def test_merge_external_is_ignored() -> None:
+def test_merge_external_is_ignored(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
     infos = [
         RepoInfo(path=".", active_top_dirs=["src"], has_commits=True),
         RepoInfo(path="@archive/old", active_top_dirs=["code"], has_commits=True),
@@ -102,7 +122,7 @@ def test_merge_external_is_ignored() -> None:
         LLMRepoClassification(path=".", role=RepoRole.own, reason="root"),
         LLMRepoClassification(path="@archive/old", role=RepoRole.external, reason="archive"),
     ]
-    own_dirs = _merge(infos, classifications)
+    own_dirs = _merge(infos, classifications, root=tmp_path)
     assert "src" in own_dirs
     assert "@archive" not in own_dirs
 

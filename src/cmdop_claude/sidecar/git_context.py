@@ -35,6 +35,8 @@ _SKIP_DIRS = frozenset({
     "node_modules", ".venv", "venv", "__pycache__", ".mypy_cache",
     "dist", "build", ".tox", ".eggs", "*.egg-info",
     "vendor", "third_party", "3rdparty",
+    # Django/Rails/uploads — user-uploaded content often contains cloned repos
+    "media", "uploads", "storage", "public/uploads",
 })
 
 # Bot email patterns — commits from these are excluded from activity scoring
@@ -277,7 +279,11 @@ async def _classify_async(
     return await loop.run_in_executor(None, _classify_sync, sdk, info, root_remote)
 
 
-def _merge(infos: list[RepoInfo], classifications: list[LLMRepoClassification]) -> set[str]:
+def _merge(
+    infos: list[RepoInfo],
+    classifications: list[LLMRepoClassification],
+    root: Path | None = None,
+) -> set[str]:
     """Compute own_top_dirs from classified repos."""
     own_top_dirs: set[str] = set()
     cls_map = {c.path: c for c in classifications}
@@ -287,8 +293,16 @@ def _merge(infos: list[RepoInfo], classifications: list[LLMRepoClassification]) 
         if not cls:
             continue
         if cls.role == RepoRole.own:
-            # Root repo — its active dirs are the project
-            own_top_dirs.update(info.active_top_dirs)
+            # Root repo — its active dirs are the project.
+            # Filter to actual directories (active_top_dirs may include files
+            # like .gitmodules from git stats).
+            for d in info.active_top_dirs:
+                if root is not None:
+                    if (root / d).is_dir():
+                        own_top_dirs.add(d)
+                else:
+                    # No root available — trust the list as-is
+                    own_top_dirs.add(d)
         elif cls.role == RepoRole.own_submodule:
             # Submodule — add its top-level dir to own
             top = info.path.split("/")[0]
@@ -341,7 +355,7 @@ class GitContextService:
         ])
         classifications = list(classifications)
 
-        own_top_dirs = _merge(infos, classifications)
+        own_top_dirs = _merge(infos, classifications, root=root)
 
         tokens_used = 0  # tracked elsewhere
 
