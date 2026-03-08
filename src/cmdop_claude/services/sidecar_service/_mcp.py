@@ -1,14 +1,17 @@
-"""Sidecar MCP registration in ~/.claude.json (global)."""
+"""Sidecar MCP registration via `claude mcp add` CLI.
+
+Claude Code stores MCP servers per-project in ~/.claude.json under
+projects["<path>"].mcpServers. There is no truly global user-scope that
+works across all projects (known Claude Code bug #16728). We use
+`claude mcp add` (local scope, default) so the server is registered for
+the current project and immediately visible in `claude mcp list`.
+"""
 import json
-from pathlib import Path
+import subprocess
+import sys
 
 from ._base import SidecarBase
 from ...models.cmdop_config import CmdopConfig
-
-
-def _global_claude_json() -> Path:
-    """Return path to ~/.claude.json."""
-    return Path.home() / ".claude.json"
 
 
 def save_api_key(key: str) -> None:
@@ -17,49 +20,35 @@ def save_api_key(key: str) -> None:
 
 
 class MCPMixin(SidecarBase):
-    """Register/unregister sidecar MCP server in global ~/.claude.json."""
+    """Register/unregister sidecar MCP server via claude CLI."""
 
     def register_mcp(self) -> bool:
-        """Register the sidecar MCP server in ~/.claude.json. Returns True if added."""
-        path = _global_claude_json()
-        data: dict = {}
-        if path.exists():
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-
-        servers = data.get("mcpServers", {})
-        if "sidecar" in servers:
+        """Register the sidecar MCP server for the current project. Returns True if added."""
+        if self.is_mcp_registered():
             return False
 
-        servers["sidecar"] = {
-            "command": "python",
-            "args": ["-m", "cmdop_claude.sidecar.server"],
-        }
-        data["mcpServers"] = servers
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        return True
+        result = subprocess.run(
+            [
+                "claude", "mcp", "add",
+                "sidecar", "--",
+                sys.executable, "-m", "cmdop_claude.sidecar.server",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0
 
     def unregister_mcp(self) -> bool:
-        """Remove the sidecar MCP server from ~/.claude.json. Returns True if removed."""
-        path = _global_claude_json()
-        if not path.exists():
+        """Remove the sidecar MCP server for the current project. Returns True if removed."""
+        if not self.is_mcp_registered():
             return False
 
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return False
-
-        servers = data.get("mcpServers", {})
-        if "sidecar" not in servers:
-            return False
-
-        del servers["sidecar"]
-        data["mcpServers"] = servers
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        return True
+        result = subprocess.run(
+            ["claude", "mcp", "remove", "sidecar"],
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0
 
     def setup_project_hooks(self) -> list[str]:
         """Create .claude/settings.json with hooks in the current project.
@@ -141,15 +130,13 @@ class MCPMixin(SidecarBase):
         return created
 
     def is_mcp_registered(self) -> bool:
-        """Check if the sidecar MCP server is in ~/.claude.json."""
-        path = _global_claude_json()
-        if not path.exists():
-            return False
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            return "sidecar" in data.get("mcpServers", {})
-        except Exception:
-            return False
+        """Check if the sidecar MCP server is registered via claude CLI."""
+        result = subprocess.run(
+            ["claude", "mcp", "get", "sidecar"],
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0
 
     def _generate_makefile(self) -> list[str]:
         """Create .claude/Makefile with convenience commands if it doesn't exist.

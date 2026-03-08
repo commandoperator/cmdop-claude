@@ -522,29 +522,48 @@ class TestMCPRegistration:
     """Test MCP server registration."""
 
     def test_register_and_check(self, service, monkeypatch) -> None:
+        import cmdop_claude.services.sidecar_service._mcp as _mcp_mod
+        from types import SimpleNamespace
+
         svc, root, claude_dir = service
-        claude_json = root / ".claude.json"
-        monkeypatch.setattr(
-            "cmdop_claude.services.sidecar_service._mcp._global_claude_json",
-            lambda: claude_json,
-        )
+        registered = [False]
+
+        def mock_run(cmd, **kwargs):
+            if "get" in cmd:
+                return SimpleNamespace(returncode=0 if registered[0] else 1, stdout="", stderr="")
+            if "add" in cmd:
+                registered[0] = True
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            if "remove" in cmd:
+                registered[0] = False
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(_mcp_mod.subprocess, "run", mock_run)
 
         assert svc.register_mcp() is True
         assert svc.is_mcp_registered() is True
 
-        assert claude_json.exists()
-        data = json.loads(claude_json.read_text(encoding="utf-8"))
-        assert "sidecar" in data["mcpServers"]
-
     def test_unregister(self, service, monkeypatch) -> None:
-        svc, root, claude_dir = service
-        claude_json = root / ".claude.json"
-        monkeypatch.setattr(
-            "cmdop_claude.services.sidecar_service._mcp._global_claude_json",
-            lambda: claude_json,
-        )
+        import cmdop_claude.services.sidecar_service._mcp as _mcp_mod
+        from types import SimpleNamespace
 
-        svc.register_mcp()
+        svc, root, claude_dir = service
+        registered = [True]
+
+        def mock_run(cmd, **kwargs):
+            if "get" in cmd:
+                return SimpleNamespace(returncode=0 if registered[0] else 1, stdout="", stderr="")
+            if "add" in cmd:
+                registered[0] = True
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            if "remove" in cmd:
+                registered[0] = False
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(_mcp_mod.subprocess, "run", mock_run)
+
         assert svc.unregister_mcp() is True
         assert svc.is_mcp_registered() is False
 

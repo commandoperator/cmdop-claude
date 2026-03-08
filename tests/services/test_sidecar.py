@@ -396,72 +396,70 @@ def test_get_current_review_with_file(service) -> None:
     assert service.get_current_review() == "# Review content"
 
 
-# ── MCP registration (global ~/.claude.json) ───────────────────────
+# ── MCP registration (via claude CLI) ──────────────────────────────
 
-_MCP_PATCH = "cmdop_claude.services.sidecar_service._mcp._global_claude_json"
+import cmdop_claude.services.sidecar_service._mcp as _mcp_module
 
 
-def test_register_mcp_creates_entry(service, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    claude_json = tmp_path / ".claude.json"
-    monkeypatch.setattr(_MCP_PATCH, lambda: claude_json)
+def _make_run_fn(get_rc: int = 1, add_rc: int = 0, remove_rc: int = 0):
+    """Return a subprocess.run replacement with configurable return codes."""
+    from types import SimpleNamespace
 
+    def run(cmd, **kwargs):
+        if "get" in cmd:
+            return SimpleNamespace(returncode=get_rc, stdout="", stderr="")
+        if "add" in cmd:
+            return SimpleNamespace(returncode=add_rc, stdout="", stderr="")
+        if "remove" in cmd:
+            return SimpleNamespace(returncode=remove_rc, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    return run
+
+
+def test_register_mcp_creates_entry(service, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list = []
+    base = _make_run_fn(get_rc=1, add_rc=0)
+
+    def tracking(cmd, **kwargs):
+        calls.append(cmd)
+        return base(cmd, **kwargs)
+
+    monkeypatch.setattr(_mcp_module.subprocess, "run", tracking)
     assert service.register_mcp() is True
-
-    assert claude_json.exists()
-    data = json.loads(claude_json.read_text(encoding="utf-8"))
-    assert "sidecar" in data["mcpServers"]
-    assert data["mcpServers"]["sidecar"]["command"] == "python"
+    assert any("add" in c for c in calls)
 
 
-def test_register_mcp_idempotent(service, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    claude_json = tmp_path / ".claude.json"
-    monkeypatch.setattr(_MCP_PATCH, lambda: claude_json)
-
-    assert service.register_mcp() is True
-    assert service.register_mcp() is False  # already registered
+def test_register_mcp_idempotent(service, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_mcp_module.subprocess, "run", _make_run_fn(get_rc=0))
+    assert service.register_mcp() is False
 
 
-def test_register_mcp_preserves_existing_keys(service, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    claude_json = tmp_path / ".claude.json"
-    claude_json.write_text('{"numStartups": 42, "autoUpdates": true}', encoding="utf-8")
-    monkeypatch.setattr(_MCP_PATCH, lambda: claude_json)
+def test_unregister_mcp_removes_entry(service, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list = []
+    base = _make_run_fn(get_rc=0, remove_rc=0)
 
-    service.register_mcp()
+    def tracking(cmd, **kwargs):
+        calls.append(cmd)
+        return base(cmd, **kwargs)
 
-    data = json.loads(claude_json.read_text(encoding="utf-8"))
-    assert data["numStartups"] == 42
-    assert data["autoUpdates"] is True
-    assert "sidecar" in data["mcpServers"]
-
-
-def test_unregister_mcp_removes_entry(service, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    claude_json = tmp_path / ".claude.json"
-    monkeypatch.setattr(_MCP_PATCH, lambda: claude_json)
-
-    service.register_mcp()
+    monkeypatch.setattr(_mcp_module.subprocess, "run", tracking)
     assert service.unregister_mcp() is True
-
-    data = json.loads(claude_json.read_text(encoding="utf-8"))
-    assert "sidecar" not in data["mcpServers"]
+    assert any("remove" in c for c in calls)
 
 
-def test_unregister_mcp_no_file(service, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    claude_json = tmp_path / ".claude.json"
-    monkeypatch.setattr(_MCP_PATCH, lambda: claude_json)
-
+def test_unregister_mcp_not_registered(service, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_mcp_module.subprocess, "run", _make_run_fn(get_rc=1))
     assert service.unregister_mcp() is False
 
 
-def test_is_mcp_registered(service, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    claude_json = tmp_path / ".claude.json"
-    monkeypatch.setattr(_MCP_PATCH, lambda: claude_json)
-
-    assert service.is_mcp_registered() is False
-
-    service.register_mcp()
+def test_is_mcp_registered_true(service, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_mcp_module.subprocess, "run", _make_run_fn(get_rc=0))
     assert service.is_mcp_registered() is True
 
-    service.unregister_mcp()
+
+def test_is_mcp_registered_false(service, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_mcp_module.subprocess, "run", _make_run_fn(get_rc=1))
     assert service.is_mcp_registered() is False
 
 
