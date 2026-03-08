@@ -49,7 +49,7 @@ class SidecarBase(BaseService):
         self._sidecar_dir = self._claude_dir / ".sidecar"
         self._usage_file = self._sidecar_dir / "usage.json"
         self._suppress_file = self._sidecar_dir / "suppressed.json"
-        if not config.sdkrouter_api_key or config.sdkrouter_api_key == "test-api-key":
+        if not config.sdkrouter_api_key:
             logger.debug("SDKROUTER_API_KEY not set. %s", _SDKROUTER_HELP)
         self._sdk = SDKRouter(api_key=config.sdkrouter_api_key)
         self._model = config.sidecar_model

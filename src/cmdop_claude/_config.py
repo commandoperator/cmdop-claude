@@ -14,8 +14,8 @@ _cmdop: CmdopConfig = CmdopConfig.load()
 
 
 def _default_sdkrouter_key() -> str:
-    """env var → cmdop.json → empty string (LLM features silently skip)."""
-    return os.environ.get("SDKROUTER_API_KEY") or _cmdop.sdkrouter_api_key or ""
+    """env var → cmdop.json → test-api-key sentinel (LLM features fail gracefully)."""
+    return os.environ.get("SDKROUTER_API_KEY") or _cmdop.sdkrouter_api_key or "test-api-key"
 
 
 def _default_smithery_key() -> str:
