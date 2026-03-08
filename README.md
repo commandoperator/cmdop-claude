@@ -16,7 +16,7 @@ Claude Code's `.claude/` folder is powerful but static. `cmdop-claude` makes it 
 - **Project map** — annotates directories with one-sentence descriptions. Cached by SHA256; only changed dirs cost tokens.
 - **Task queue** — review findings become structured tasks (`T-001.md`, `T-002.md`, ...). Top pending items injected into every prompt automatically.
 - **Auto-fix** — LLM generates targeted file edits for any task. Preview diff or apply directly.
-- **Project init** — bootstraps `CLAUDE.md` + rules from scratch for bare projects. Smart 3-phase pipeline: git context → filtered code snippets → cached tree summaries.
+- **Project init** — bootstraps `CLAUDE.md` + rules from scratch for bare projects. Two-step LLM pipeline: cheap model selects which files to read → balanced model generates project-specific docs.
 - **Plugin browser** — searches Smithery + Official MCP registries (~1000 plugins), installs to `~/.claude.json`.
 
 Everything runs as Claude Code hooks. Zero manual steps after setup.
@@ -40,15 +40,11 @@ PostToolUse hook (Write|Edit)
       └─ LLM annotates new/changed dirs only
 
 sidecar_init (MCP tool / CLI)
-  ├─ Phase 1: GitContextService — finds all .git repos, classifies own vs external
-  │   └─ LLM + hard rules → own_top_dirs set
-  ├─ Phase 2: smart snippets filtered to own dirs
-  │   ├─ entry points, Makefiles, configs
-  │   └─ external dirs (@archive, @vendor, submodules) excluded
-  └─ Phase 3: TreeSummarizer with MerkleCache
-      ├─ TOON format (~60% fewer tokens than JSON)
-      ├─ Merkle hash per dir → skip LLM for unchanged
-      └─ parallel LLM chunks (asyncio)
+  ├─ Step 1 (cheap LLM): build file tree → select ≤25 most informative files
+  │   └─ prioritises: configs, entry points, core domain, Makefile
+  └─ Step 2 (balanced LLM): read selected files (40 lines each) → generate
+      ├─ CLAUDE.md — project-specific, references actual files/libs
+      └─ .claude/rules/*.md — tech-stack rules with real file citations
 ```
 
 ---
@@ -243,7 +239,7 @@ src/cmdop_claude/
 │       ├── _base.py            # State, lock, scan, usage, activity
 │       ├── _review.py          # LLM review → review.md
 │       ├── _fix.py             # LLM fix for tasks
-│       ├── _init.py            # 3-phase project init pipeline
+│       ├── _init.py            # two-step LLM init pipeline (file select → generate)
 │       ├── _tasks.py           # Task CRUD
 │       ├── _mcp.py             # MCP registration + hooks + Makefile
 │       └── _status.py          # Status + map access
@@ -251,6 +247,7 @@ src/cmdop_claude/
     ├── server.py               # FastMCP server (12 tools)
     ├── hook.py                 # CLI (11 commands)
     ├── git_context.py          # GitContextService — own vs external repo classification
+    ├── text_utils.py           # normalize_content — strip control chars, collapse blank lines
     ├── tree_summarizer.py      # TreeSummarizer — chunked parallel LLM dir analysis
     ├── toon.py                 # TOON serializer — token-efficient tree format
     ├── merkle_cache.py         # MerkleCache — SHA256 dir hashing, skips LLM for unchanged
@@ -285,7 +282,7 @@ src/cmdop_claude/
 ## Testing
 
 ```bash
-make test   # 364+ tests
+make test   # 375+ tests
 ```
 
 ---
