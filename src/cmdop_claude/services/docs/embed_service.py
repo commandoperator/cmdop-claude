@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -19,6 +20,7 @@ _EMBED_MODEL: dict[str, str] = {
 
 EMBED_DIMS = 1536  # text-embedding-3-small dimensions
 EMBED_BATCH_SIZE = 100  # max texts per API call
+EMBED_CONCURRENCY = 8   # parallel batch requests
 
 
 class EmbedService:
@@ -38,23 +40,44 @@ class EmbedService:
             api_key=routing.api_key or "no-key",
             llm_url=routing.resolved_base_url,
             use_self_hosted=False,
+            timeout=120.0,
         )
 
+    def _embed_batch(self, batch: list[str]) -> list[list[float]]:
+        resp = self._client.embeddings.create(batch, model=self._model)
+        ordered = sorted(resp.data, key=lambda d: d.index)
+        return [d.embedding for d in ordered]
+
     def embed(self, texts: list[str]) -> list[list[float]]:
-        """Embed a batch of texts. Returns list of float vectors."""
+        """Embed texts in parallel batches. Returns list of float vectors in input order."""
         if not texts:
             return []
-        result: list[list[float]] = []
-        for i in range(0, len(texts), EMBED_BATCH_SIZE):
-            batch = texts[i:i + EMBED_BATCH_SIZE]
-            try:
-                resp = self._client.embeddings.create(batch, model=self._model)
-                ordered = sorted(resp.data, key=lambda d: d.index)
-                result.extend(d.embedding for d in ordered)
-            except Exception as e:
-                logger.error("Embedding batch %d-%d failed: %s", i, i + len(batch), e)
-                raise
-        return result
+
+        batches = [
+            texts[i:i + EMBED_BATCH_SIZE]
+            for i in range(0, len(texts), EMBED_BATCH_SIZE)
+        ]
+
+        results: list[list[list[float]] | None] = [None] * len(batches)
+
+        with ThreadPoolExecutor(max_workers=EMBED_CONCURRENCY) as pool:
+            future_to_idx = {
+                pool.submit(self._embed_batch, batch): idx
+                for idx, batch in enumerate(batches)
+            }
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                offset = idx * EMBED_BATCH_SIZE
+                try:
+                    results[idx] = future.result()
+                except Exception as e:
+                    logger.error(
+                        "Embedding batch %d-%d failed: %s",
+                        offset, offset + len(batches[idx]), e,
+                    )
+                    raise
+
+        return [emb for batch_result in results for emb in (batch_result or [])]
 
     def embed_one(self, text: str) -> list[float]:
         return self.embed([text])[0]
