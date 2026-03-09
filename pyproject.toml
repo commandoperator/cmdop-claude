@@ -1,6 +1,6 @@
 [project]
 name = "cmdop-claude"
-version = "0.1.45"
+version = "0.1.46"
 description = "Self-maintaining .claude/ runtime — LLM-powered doc review, project map, task queue, auto-fix, and project init"
 readme = "README.md"
 license = "MIT"
@@ -24,6 +24,7 @@ dependencies = [
     "fastmcp>=3.0.0",
     "tomli>=2.0.0; python_version < '3.11'",
     "GitPython>=3.1.42",
+    "sqlite-vec>=0.1.6",
 ]
 requires-python = ">=3.10"
 
