@@ -5,7 +5,7 @@ from streamlit_option_menu import option_menu
 from cmdop_claude import Client
 
 from ._auditor import render_auditor
-from ._skills import render_skills
+from .skills import render_skills
 from ._mcp import render_mcp_studio, render_plugin_browser
 from ._docs import render_docs_browser
 from ._hooks import render_hooks
