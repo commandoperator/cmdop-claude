@@ -11,7 +11,7 @@ from cmdop_claude.models.cmdop_config import CmdopConfig, CmdopPaths
 
 def test_load_returns_defaults_when_no_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "cmdop_claude.models.cmdop_config.CMDOP_JSON_PATH",
+        "cmdop_claude.models.config.cmdop_config.CMDOP_JSON_PATH",
         tmp_path / "cmdop.json",
     )
     cfg = CmdopConfig.load()
@@ -27,7 +27,7 @@ def test_load_reads_camel_case_keys(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         "sidecarModel": "openai/gpt-4o",
         "debugMode": True,
     }))
-    monkeypatch.setattr("cmdop_claude.models.cmdop_config.CMDOP_JSON_PATH", p)
+    monkeypatch.setattr("cmdop_claude.models.config.cmdop_config.CMDOP_JSON_PATH", p)
     cfg = CmdopConfig.load()
     assert cfg.sdkrouter_api_key == "sk-test-123"
     assert cfg.sidecar_model == "openai/gpt-4o"
@@ -37,14 +37,14 @@ def test_load_reads_camel_case_keys(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 def test_load_tolerates_invalid_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     p = tmp_path / "cmdop.json"
     p.write_text("not json {{{{")
-    monkeypatch.setattr("cmdop_claude.models.cmdop_config.CMDOP_JSON_PATH", p)
+    monkeypatch.setattr("cmdop_claude.models.config.cmdop_config.CMDOP_JSON_PATH", p)
     cfg = CmdopConfig.load()
     assert cfg.sdkrouter_api_key == ""
 
 
 def test_save_writes_camel_case(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     p = tmp_path / "cmdop.json"
-    monkeypatch.setattr("cmdop_claude.models.cmdop_config.CMDOP_JSON_PATH", p)
+    monkeypatch.setattr("cmdop_claude.models.config.cmdop_config.CMDOP_JSON_PATH", p)
     cfg = CmdopConfig(sdkrouter_api_key="sk-abc")
     cfg.save()
     data = json.loads(p.read_text())
@@ -54,7 +54,7 @@ def test_save_writes_camel_case(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 def test_save_merges_with_existing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     p = tmp_path / "cmdop.json"
     p.write_text(json.dumps({"existingKey": "keep-me"}))
-    monkeypatch.setattr("cmdop_claude.models.cmdop_config.CMDOP_JSON_PATH", p)
+    monkeypatch.setattr("cmdop_claude.models.config.cmdop_config.CMDOP_JSON_PATH", p)
     cfg = CmdopConfig(sdkrouter_api_key="new-key")
     cfg.save()
     data = json.loads(p.read_text())
@@ -64,7 +64,7 @@ def test_save_merges_with_existing(tmp_path: Path, monkeypatch: pytest.MonkeyPat
 
 def test_set_api_key_persists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     p = tmp_path / "cmdop.json"
-    monkeypatch.setattr("cmdop_claude.models.cmdop_config.CMDOP_JSON_PATH", p)
+    monkeypatch.setattr("cmdop_claude.models.config.cmdop_config.CMDOP_JSON_PATH", p)
     cfg = CmdopConfig.load()
     cfg.set_api_key("sk-persisted")
     data = json.loads(p.read_text())

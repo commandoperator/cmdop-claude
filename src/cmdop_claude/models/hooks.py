@@ -1,10 +1,5 @@
-"""Hooks models."""
-from typing import List, Optional
-from pydantic import Field
-from .base import CoreModel
+"""Re-export — moved to models/claude/hooks.py."""
+from cmdop_claude.models.claude.hooks import *  # noqa: F401, F403
+from cmdop_claude.models.claude.hooks import HookConfig
 
-class HookConfig(CoreModel):
-    """Configuration for a Claude hook."""
-    events: List[str]
-    script: str
-    args: Optional[List[str]] = Field(default_factory=list)
+__all__ = ["HookConfig"]
