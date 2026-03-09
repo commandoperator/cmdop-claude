@@ -53,7 +53,7 @@ def mcp_list_servers() -> str:
         return "No MCP servers found in ~/.claude.json or .mcp.json."
 
     lines.insert(0, "# MCP Servers Available to Claude\n")
-    lines.append("Note: sidecar tools (sidecar_tasks, sidecar_scan, sidecar_map, docs_search, docs_get, docs_list) are called directly without ToolSearch.")
+    lines.append("Note: sidecar tools (sidecar_tasks, sidecar_scan, sidecar_map, docs_search, docs_get, docs_list, skills_list, skills_get, skills_search) are called directly without ToolSearch.")
     return "\n".join(lines)
 
 

@@ -5,13 +5,14 @@ Register globally:
 """
 from fastmcp import FastMCP
 
-from .tools import docs_tools, plugin_tools, sidecar_tools
+from .tools import docs_tools, plugin_tools, sidecar_tools, skills_tools
 
 mcp = FastMCP("cmdop-sidecar")
 
 sidecar_tools.register(mcp)
 docs_tools.register(mcp)
 plugin_tools.register(mcp)
+skills_tools.register(mcp)
 
 if __name__ == "__main__":
     mcp.run()
