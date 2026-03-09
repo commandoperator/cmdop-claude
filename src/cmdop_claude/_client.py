@@ -9,12 +9,13 @@ from cmdop_claude.services.claude.mcp_service import MCPService
 from cmdop_claude.services.plugins.plugin_service import PluginService
 from cmdop_claude.services.sidecar import SidecarService, TaskService, ReviewService
 from cmdop_claude.services.skills.skill_service import SkillService
+from cmdop_claude.services.skills.registry_service import RegistryService
 
 
 class Client:
     """Main synchronous client for the Claude Control Plane."""
 
-    __slots__ = ("_config", "_skill_service", "_claude_service", "_hooks_service", "_mcp_service", "_plugin_service", "_sidecar_service")
+    __slots__ = ("_config", "_skill_service", "_registry_service", "_claude_service", "_hooks_service", "_mcp_service", "_plugin_service", "_sidecar_service")
 
     def __init__(self, claude_dir_path: Optional[str] = None) -> None:
         if claude_dir_path is not None:
@@ -23,6 +24,7 @@ class Client:
             self._config = get_config()
 
         self._skill_service: Optional[SkillService] = None
+        self._registry_service: Optional[RegistryService] = None
         self._claude_service: Optional[ClaudeService] = None
         self._hooks_service: Optional[HooksService] = None
         self._mcp_service: Optional[MCPService] = None
@@ -38,6 +40,14 @@ class Client:
         if self._skill_service is None:
             self._skill_service = SkillService(self._config)
         return self._skill_service
+
+    @property
+    def registry(self) -> RegistryService:
+        if self._registry_service is None:
+            from pathlib import Path
+            skills_dir = Path(self._config.claude_dir_path) / "skills"
+            self._registry_service = RegistryService(skills_dir=skills_dir)
+        return self._registry_service
 
     @property
     def claude(self) -> ClaudeService:
