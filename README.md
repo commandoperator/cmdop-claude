@@ -20,6 +20,7 @@ Claude Code's `.claude/` folder is powerful but static. `cmdop-claude` makes it 
 - **Docs search (FTS5)** — `docs_search` / `docs_get` MCP tools with BM25 full-text search over bundled + custom doc sources. No external service.
 - **Docs semantic search** — `docs_semantic_search` MCP tool finds conceptually similar docs using embeddings + sqlite-vec. Build index with `make embed-docs`.
 - **Plugin browser** — searches Smithery + Official MCP registries (~1000 plugins), installs to `~/.claude.json`.
+- **Streamlit dashboard** — 11-tab UI: key management, auditor, task queue, project map, plugin browser, docs browser, hooks manager, and more.
 
 Everything runs as Claude Code hooks. Zero manual steps after setup.
 
@@ -76,20 +77,32 @@ pip install cmdop-claude[ui]
 ## Quick Start
 
 ```bash
-pip install cmdop-claude
+pip install cmdop-claude[ui]
 cd your-project
 python -m cmdop_claude.sidecar.hook setup
 ```
 
 `setup` does everything in one shot:
 
-- Prompts for LLM provider (OpenRouter / OpenAI / SDKRouter) and API key
-- Saves config to `~/.claude/cmdop/config.json` (once for all projects)
 - Registers the MCP server for the current project via `claude mcp add`
 - Installs Claude Code hooks in `.claude/settings.json`
 - Configures `plansDirectory: ".claude/plans"`
 - Generates `.claude/Makefile` with convenience commands
 - Runs `init` if no `CLAUDE.md` found → generates docs via LLM
+
+Then configure your API key in the dashboard:
+
+```bash
+make run   # http://localhost:8501 → Settings & Security → LLM Provider
+```
+
+Or set an environment variable before running Claude Code:
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...   # OpenRouter (recommended)
+export OPENAI_API_KEY=sk-...          # OpenAI
+export SDKROUTER_API_KEY=...          # SDKRouter
+```
 
 ### Uninstall
 
@@ -179,6 +192,8 @@ make -C .claude dashboard  # from project with generated Makefile
 
 11 tabs: Health Auditor, Skill Studio, MCP Studio, Plugin Browser, Docs Browser, Hooks Manager, Sidecar Monitor, Project Map, Task Queue, Settings & Security, Trigger Graph.
 
+**Settings & Security → LLM Provider** — configure API keys, switch providers, test connection, manage Smithery key. View all env var statuses in one place.
+
 **Docs Browser** — search and read bundled documentation directly in the UI. Grouped by source, full-text search, inline markdown rendering.
 
 **Plugin Browser** — searches Smithery + Official MCP registries (~1000 plugins) with background index caching.
@@ -199,10 +214,10 @@ make -C .claude dashboard  # from project with generated Makefile
 
 ### LLM Provider
 
-Configured during `setup`. Supports three providers:
+Configured via the dashboard (`make run` → Settings & Security → LLM Provider) or by setting an env var. Supports three providers:
 
-| Mode | Default Model | Embeddings endpoint | Key |
-|------|--------------|--------------------|----|
+| Mode | Default Model | LLM/Embeddings endpoint | Key |
+|------|--------------|--------------------|-----|
 | `openrouter` | deepseek/deepseek-v3-r1 | openrouter.ai/api/v1 | [openrouter.ai/keys](https://openrouter.ai/keys) |
 | `openai` | gpt-4o-mini | api.openai.com/v1 | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
 | `sdkrouter` | deepseek/deepseek-v3.2 | llm.sdkrouter.com/v1 | [sdkrouter.com](https://sdkrouter.com) |
@@ -221,7 +236,7 @@ Config is written as:
 }
 ```
 
-Or set via env var (`OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `SDKROUTER_API_KEY`) — takes precedence over config file.
+Env vars take precedence over config file: `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `SDKROUTER_API_KEY`.
 
 ### Docs Sources
 
@@ -312,7 +327,7 @@ src/cmdop_claude/
 │   ├── docs/
 │   │   ├── docs_service.py     # DocsService — SQLite FTS5 search + MDX converter
 │   │   ├── docs_builder.py     # build_db — indexes docs into docs.db at publish time
-│   │   ├── embed_service.py    # EmbedService — text-embedding-3-small via SDKRouter
+│   │   ├── embed_service.py    # EmbedService — text-embedding-3-small via provider
 │   │   └── vector_indexer.py   # VectorIndexer — sqlite-vec index build + search
 │   ├── plugin_service.py       # Registry search, install, background indexing
 │   ├── mcp_service.py          # MCP config read/write
@@ -326,23 +341,33 @@ src/cmdop_claude/
 │       └── _status.py          # Status + map access
 ├── docs/
 │   └── docs.db                 # Bundled SQLite FTS5 index
-└── sidecar/
-    ├── server.py               # FastMCP server (16 tools)
-    ├── hook.py                 # CLI (11 commands)
-    ├── tools/
-    │   ├── docs_tools.py       # docs_search, docs_get, docs_list, docs_semantic_search
-    │   └── sidecar_tools.py    # sidecar_* tools
-    ├── git_context.py          # GitContextService
-    ├── tree_summarizer.py      # TreeSummarizer
-    ├── toon.py                 # TOON serializer
-    ├── merkle_cache.py         # MerkleCache
-    ├── mapper.py               # Project map generator
-    ├── scanner.py              # .claude/ filesystem scanner
-    ├── exclusions.py           # Junk filter + .gitignore integration
-    ├── activity.py             # Activity logger (JSONL, auto-rotate)
-    ├── cache.py                # SHA256 annotation cache
-    ├── tasks.py                # Task queue manager
-    └── prompts.py              # LLM prompt templates
+├── sidecar/
+│   ├── server.py               # FastMCP server (16 tools)
+│   ├── hook.py                 # CLI (11 commands)
+│   ├── tools/
+│   │   ├── docs_tools.py       # docs_search, docs_get, docs_list, docs_semantic_search
+│   │   └── sidecar_tools.py    # sidecar_* tools
+│   ├── git_context.py          # GitContextService
+│   ├── tree_summarizer.py      # TreeSummarizer
+│   ├── toon.py                 # TOON serializer
+│   ├── merkle_cache.py         # MerkleCache
+│   ├── mapper.py               # Project map generator
+│   ├── scanner.py              # .claude/ filesystem scanner
+│   ├── exclusions.py           # Junk filter + .gitignore integration
+│   ├── activity.py             # Activity logger (JSONL, auto-rotate)
+│   ├── cache.py                # SHA256 annotation cache
+│   ├── tasks.py                # Task queue manager
+│   └── prompts.py              # LLM prompt templates
+└── ui/
+    ├── main.py                 # Streamlit entry point
+    └── app/
+        ├── __init__.py         # main() + tab routing (11 tabs)
+        ├── _settings.py        # Settings & Security tab
+        ├── settings/
+        │   ├── _llm.py         # LLM Provider — key mgmt, test connection, env status
+        │   ├── _claude_settings.py  # settings.json editor
+        │   └── _guardrails.py  # permissions editor
+        └── ...                 # other tabs
 ```
 
 ---
