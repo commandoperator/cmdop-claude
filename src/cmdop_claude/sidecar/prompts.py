@@ -233,16 +233,7 @@ Generate:
    - ## Tech Stack (list ONLY technologies evidenced by imports, dependencies, or code snippets above)
    - ## Commands (ONLY commands from Makefile targets or evidenced by pyproject.toml scripts — do NOT invent commands)
    - ## Architecture (key directories, entry points from code snippets, data flow)
-   - ## Workflow — MANDATORY section, always include these rules:
-     - Before starting complex tasks, check `.claude/plans/` for existing plans and save new plans there
-     - Periodically use `sidecar_tasks` MCP tool to check pending tasks (do NOT use built-in TaskList — it is unrelated)
-     - Sidecar MCP tools (`sidecar_tasks`, `sidecar_scan`, `sidecar_map`, `docs_search`, `docs_get`, `docs_list`) are called directly — they are NOT deferred tools, do NOT search for them via ToolSearch
-     - Use `docs_search` to find relevant documentation before working with unfamiliar APIs or libs. Use `docs_list` to see what's available.
-     - After major changes, use sidecar tools: `sidecar_scan` to review docs, `sidecar_map` to update project map
-     - Read `.claude/rules/` for project-specific coding guidelines before making changes
-     - Keep CLAUDE.md under 200 lines — move detailed rules to `.claude/rules/*.md`
-     - When working with external APIs, databases, browsers, or new tools — check if a relevant MCP plugin exists: use `sidecar_tasks` or browse plugins via `make -C .claude dashboard` (Plugin Browser tab). Installing the right MCP server can save significant time.
-     - {docs_workflow_hint}
+   - ## Workflow — include a placeholder line "- (sidecar workflow injected automatically)"; the actual content will be injected programmatically after generation
    - ## Key Rules (5-8 bullet points — MUST reference actual file names, libraries, or patterns from the snippets above. NO generic rules like "use PEP 8" or "write tests".)
 2. 2-3 rules files in .claude/rules/ (e.g. ".claude/rules/testing.md") — specific to THIS project's tech stack and patterns. Rules MUST cite specific files, classes, or patterns seen in the code snippets. Each rule file must have 10+ lines.
 

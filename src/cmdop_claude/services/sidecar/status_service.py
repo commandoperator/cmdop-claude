@@ -1,17 +1,19 @@
-"""Sidecar status and map access."""
-import json
+"""StatusService — status reporting and map access."""
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
-from ...models.sidecar import SidecarStatus
-from ._base import SidecarBase
+from cmdop_claude.models.sidecar.status import SidecarStatus
+
+from .state import SidecarState
 
 
-class StatusMixin(SidecarBase):
-    """Status reporting and map access."""
+class StatusService:
+    def __init__(self, state: SidecarState) -> None:
+        self._s = state
 
     def get_status(self) -> SidecarStatus:
-        """Return current sidecar state."""
-        review_path = self._sidecar_dir / "review.md"
+        review_path = self._s.sidecar_dir / "review.md"
         last_run: datetime | None = None
         pending = 0
 
@@ -25,19 +27,15 @@ class StatusMixin(SidecarBase):
             except Exception:
                 pass
 
-        suppressed = self._load_suppressed()
+        suppressed = self._s.load_suppressed()
         tokens_today = 0
         cost_today = 0.0
 
-        if self._usage_file.exists():
-            try:
-                data = json.loads(self._usage_file.read_text(encoding="utf-8"))
-                today = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
-                if data.get("date") == today:
-                    tokens_today = data.get("tokens", 0)
-                    cost_today = tokens_today * 0.00000025
-            except Exception:
-                pass
+        data = self._s.load_usage()
+        today = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+        if data.get("date") == today:
+            tokens_today = data.get("tokens", 0)
+            cost_today = tokens_today * 0.00000025
 
         return SidecarStatus(
             enabled=True,
@@ -49,11 +47,10 @@ class StatusMixin(SidecarBase):
         )
 
     def generate_map(self):
-        """Generate or update the project map."""
-        mapper = self._get_mapper()
+        mapper = self._s.get_mapper()
         result = mapper.generate()
-        self._track_usage(result.tokens_used)
-        self._log_activity(
+        self._s.track_usage(result.tokens_used)
+        self._s.log_activity(
             "map", tokens=result.tokens_used, model=result.model_used,
             directories=len(result.directories),
             entry_points=len(result.entry_points),
@@ -61,6 +58,5 @@ class StatusMixin(SidecarBase):
         return result
 
     def get_current_map(self) -> str:
-        """Return current project-map.md content, or empty string."""
-        mapper = self._get_mapper()
+        mapper = self._s.get_mapper()
         return mapper.get_current_map()

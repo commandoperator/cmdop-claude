@@ -33,7 +33,7 @@ def render_docs_browser(client: Client) -> None:  # noqa: ARG001
     st.markdown("Search and read documentation sources available to your agents via `docs_search` / `docs_get` MCP tools.")
 
     cfg = _load_config()
-    svc = DocsService(cfg.docs_sources)
+    svc = DocsService(cfg.docs_sources, cfg.package_sources)
 
     tab_search, tab_sources = st.tabs(["Search", "Sources"])
 

@@ -11,10 +11,36 @@ from .base import CoreModel
 
 
 class DocsSource(CoreModel):
-    """A single documentation source with path and human-readable description."""
+    """A single documentation source with path and human-readable description.
+
+    type:
+      "dir"      — (default) directory of .md/.mdx files, indexed as-is
+      "packages" — monorepo packages dir; each sub-package becomes one document
+                   combining its README.md + src/index.ts export signatures
+    """
 
     path: str
     description: str = ""
+    type: str = "dir"  # "dir" | "packages"
+
+    model_config = {"populate_by_name": True}
+
+
+class PackageSource(CoreModel):
+    """A monorepo packages directory to index for documentation.
+
+    Each immediate subdirectory with a package.json or src/ is treated as one package.
+    LLM synthesizes docs from README + stories + export lines.
+    Index stored at ~/.claude/cmdop/pkg_index/<hash>/index.db.
+    """
+
+    path: str
+    description: str = ""
+    exclude_dirs: list[str] = Field(
+        default_factory=lambda: [
+            "@refactoring", "@dev", "@docs", "@sources", ".tmp",
+        ]
+    )
 
     model_config = {"populate_by_name": True}
 
@@ -94,10 +120,31 @@ class CmdopConfig(CoreModel):
         alias="docsPaths",
     )
 
+    # Package sources — monorepo packages dirs, indexed via LLM synthesis
+    package_sources: list[PackageSource] = Field(
+        default_factory=list,
+        alias="packagesPaths",
+    )
+
     @field_validator("docs_sources", mode="before")
     @classmethod
     def coerce_docs_sources(cls, v: object) -> list[DocsSource]:
         return _coerce_docs_sources(v)
+
+    @field_validator("package_sources", mode="before")
+    @classmethod
+    def coerce_package_sources(cls, v: object) -> list[PackageSource]:
+        if not isinstance(v, list):
+            return []
+        result = []
+        for item in v:
+            if isinstance(item, str):
+                result.append(PackageSource(path=item))
+            elif isinstance(item, dict):
+                result.append(PackageSource(**item))
+            elif isinstance(item, PackageSource):
+                result.append(item)
+        return result
 
     @property
     def docs_paths(self) -> list[str]:

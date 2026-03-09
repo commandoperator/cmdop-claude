@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Generator
 import frontmatter  # python-frontmatter — already a project dependency
 
 if TYPE_CHECKING:
-    from ..models.cmdop_config import DocsSource
+    from ..models.cmdop_config import DocsSource, PackageSource
 
 
 class DocsResult:
@@ -67,8 +67,13 @@ class DocsService:
 
     EXTENSIONS = {".md", ".mdx"}
 
-    def __init__(self, sources: list[DocsSource]) -> None:
+    def __init__(
+        self,
+        sources: list[DocsSource],
+        package_sources: list[PackageSource] | None = None,
+    ) -> None:
         self._sources = sources
+        self._package_sources: list[PackageSource] = package_sources or []
 
     # ── MDX conversion (static, also used by docs_builder) ───────────
 
@@ -173,6 +178,14 @@ class DocsService:
                 yield label, sqlite3.connect(f"file:{p}?mode=ro", uri=True)
             elif p.is_dir():
                 yield label, self._memory_db_for_dir(p, label)
+
+        # Package sources — pre-built index DBs
+        for pkg_src in self._package_sources:
+            from .package_indexer import _pkg_index_dir
+            db_path = _pkg_index_dir(pkg_src.path) / "index.db"
+            if db_path.exists():
+                label = pkg_src.description or pkg_src.path
+                yield label, sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
     # ── Public API ────────────────────────────────────────────────────
 

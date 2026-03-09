@@ -17,23 +17,23 @@ from cmdop_claude.models.task import SidecarTask, TaskPriority, TaskSource
 @pytest.fixture(autouse=True)
 def reset_server_singleton():
     """Reset the module-level _service singleton between tests."""
-    import cmdop_claude.sidecar.server as srv
-    srv._service = None
+    import cmdop_claude.sidecar.tools.sidecar_tools as st
+    st._service = None
     yield
-    srv._service = None
+    st._service = None
 
 
 @pytest.fixture()
 def mock_svc():
     """Mock SidecarService so no real scanning or LLM calls happen."""
-    with patch("cmdop_claude.sidecar.server._get_service") as mock_get:
+    with patch("cmdop_claude.sidecar.tools.sidecar_tools._get_service") as mock_get:
         svc = MagicMock()
         mock_get.return_value = svc
         yield svc
 
 
 def test_sidecar_scan_returns_issues(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_scan
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_scan
 
     mock_svc.generate_review.return_value = ReviewResult(
         generated_at="2026-03-06T00:00:00Z",
@@ -59,7 +59,7 @@ def test_sidecar_scan_returns_issues(mock_svc) -> None:
 
 
 def test_sidecar_scan_no_issues(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_scan
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_scan
 
     mock_svc.generate_review.return_value = ReviewResult(
         generated_at="2026-03-06T00:00:00Z",
@@ -74,7 +74,7 @@ def test_sidecar_scan_no_issues(mock_svc) -> None:
 
 
 def test_sidecar_scan_lock_held(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_scan
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_scan
 
     mock_svc.generate_review.side_effect = RuntimeError("lock held")
 
@@ -84,7 +84,7 @@ def test_sidecar_scan_lock_held(mock_svc) -> None:
 
 
 def test_sidecar_status(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_status
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_status
 
     mock_svc.get_status.return_value = SidecarStatus(
         enabled=True,
@@ -103,7 +103,7 @@ def test_sidecar_status(mock_svc) -> None:
 
 
 def test_sidecar_status_never_run(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_status
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_status
 
     mock_svc.get_status.return_value = SidecarStatus(enabled=True)
 
@@ -113,7 +113,7 @@ def test_sidecar_status_never_run(mock_svc) -> None:
 
 
 def test_sidecar_acknowledge(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_acknowledge
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_acknowledge
 
     result = sidecar_acknowledge("abc123", days=7)
 
@@ -122,7 +122,7 @@ def test_sidecar_acknowledge(mock_svc) -> None:
 
 
 def test_sidecar_acknowledge_default_days(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_acknowledge
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_acknowledge
 
     result = sidecar_acknowledge("xyz789")
 
@@ -131,7 +131,7 @@ def test_sidecar_acknowledge_default_days(mock_svc) -> None:
 
 
 def test_sidecar_review_returns_content(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_review
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_review
 
     mock_svc.get_current_review.return_value = "# Sidecar Review\n\n## Staleness\n- CLAUDE.md is old"
 
@@ -142,7 +142,7 @@ def test_sidecar_review_returns_content(mock_svc) -> None:
 
 
 def test_sidecar_review_no_review(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_review
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_review
 
     mock_svc.get_current_review.return_value = ""
 
@@ -155,7 +155,7 @@ def test_sidecar_review_no_review(mock_svc) -> None:
 
 
 def test_sidecar_map_success(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_map
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_map
 
     mock_svc.generate_map.return_value = ProjectMap(
         generated_at=datetime.now(tz=timezone.utc),
@@ -179,7 +179,7 @@ def test_sidecar_map_success(mock_svc) -> None:
 
 
 def test_sidecar_map_error(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_map
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_map
 
     mock_svc.generate_map.side_effect = RuntimeError("SDK error")
 
@@ -192,7 +192,7 @@ def test_sidecar_map_error(mock_svc) -> None:
 
 
 def test_sidecar_map_view_returns_content(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_map_view
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_map_view
 
     mock_svc.get_current_map.return_value = "# Project Map\n> python — CLI tool"
 
@@ -202,7 +202,7 @@ def test_sidecar_map_view_returns_content(mock_svc) -> None:
 
 
 def test_sidecar_map_view_empty(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_map_view
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_map_view
 
     mock_svc.get_current_map.return_value = ""
 
@@ -228,7 +228,7 @@ def _make_mock_task(**overrides) -> SidecarTask:
 
 
 def test_sidecar_tasks_list_all(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_tasks
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_tasks
 
     mock_svc.list_tasks.return_value = [
         _make_mock_task(id="T-001"),
@@ -244,7 +244,7 @@ def test_sidecar_tasks_list_all(mock_svc) -> None:
 
 
 def test_sidecar_tasks_filter_by_status(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_tasks
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_tasks
 
     mock_svc.list_tasks.return_value = [_make_mock_task()]
 
@@ -254,7 +254,7 @@ def test_sidecar_tasks_filter_by_status(mock_svc) -> None:
 
 
 def test_sidecar_tasks_empty(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_tasks
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_tasks
 
     mock_svc.list_tasks.return_value = []
 
@@ -264,7 +264,7 @@ def test_sidecar_tasks_empty(mock_svc) -> None:
 
 
 def test_sidecar_tasks_with_context_files(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_tasks
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_tasks
 
     mock_svc.list_tasks.return_value = [
         _make_mock_task(context_files=["src/auth.ts", "CLAUDE.md"]),
@@ -279,7 +279,7 @@ def test_sidecar_tasks_with_context_files(mock_svc) -> None:
 
 
 def test_sidecar_task_update_success(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_task_update
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_task_update
 
     mock_svc.update_task_status.return_value = True
 
@@ -290,7 +290,7 @@ def test_sidecar_task_update_success(mock_svc) -> None:
 
 
 def test_sidecar_task_update_not_found(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_task_update
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_task_update
 
     mock_svc.update_task_status.return_value = False
 
@@ -303,7 +303,7 @@ def test_sidecar_task_update_not_found(mock_svc) -> None:
 
 
 def test_sidecar_task_create(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_task_create
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_task_create
 
     mock_svc.create_task.return_value = _make_mock_task(
         id="T-005", title="New task", priority="high"
@@ -327,7 +327,7 @@ def test_sidecar_task_create(mock_svc) -> None:
 
 
 def test_sidecar_task_create_defaults(mock_svc) -> None:
-    from cmdop_claude.sidecar.server import sidecar_task_create
+    from cmdop_claude.sidecar.tools.sidecar_tools import sidecar_task_create
 
     mock_svc.create_task.return_value = _make_mock_task(
         id="T-001", title="Simple task"

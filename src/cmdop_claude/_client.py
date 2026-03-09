@@ -1,13 +1,15 @@
 from pathlib import Path
 from typing import Optional
-from ._config import Config, configure, get_config
-from .services.skill_service import SkillService
-from .services.claude_service import ClaudeService
-from .services.hooks_service import HooksService
-from .services.mcp_service import MCPService
-from .services.plugin_service import PluginService
-from .services.sidecar_service import SidecarService
-from .models.claude import ProjectStats
+
+from cmdop_claude._config import Config, configure, get_config
+from cmdop_claude.models.claude import ProjectStats
+from cmdop_claude.services.claude_service import ClaudeService
+from cmdop_claude.services.hooks_service import HooksService
+from cmdop_claude.services.mcp_service import MCPService
+from cmdop_claude.services.plugin_service import PluginService
+from cmdop_claude.services.sidecar import SidecarService, TaskService, ReviewService
+from cmdop_claude.services.skill_service import SkillService
+
 
 class Client:
     """Main synchronous client for the Claude Control Plane."""
@@ -28,46 +30,52 @@ class Client:
         self._sidecar_service: Optional[SidecarService] = None
 
     @property
+    def config(self) -> Config:
+        return self._config
+
+    @property
     def skills(self) -> SkillService:
-        """Skill management operations."""
         if self._skill_service is None:
             self._skill_service = SkillService(self._config)
         return self._skill_service
 
     @property
     def claude(self) -> ClaudeService:
-        """Claude file and health operations."""
         if self._claude_service is None:
             self._claude_service = ClaudeService(self._config)
         return self._claude_service
 
     @property
     def hooks(self) -> HooksService:
-        """Hooks management operations."""
         if self._hooks_service is None:
             self._hooks_service = HooksService(self._config)
         return self._hooks_service
 
     @property
     def mcp(self) -> MCPService:
-        """MCP and settings management operations."""
         if self._mcp_service is None:
             self._mcp_service = MCPService(self._config)
         return self._mcp_service
 
     @property
     def plugins(self) -> PluginService:
-        """MCP plugin browser and installer."""
         if self._plugin_service is None:
             self._plugin_service = PluginService(self._config)
         return self._plugin_service
 
     @property
     def sidecar(self) -> SidecarService:
-        """Documentation sidecar (librarian) operations."""
         if self._sidecar_service is None:
             self._sidecar_service = SidecarService(self._config)
         return self._sidecar_service
+
+    @property
+    def review(self) -> ReviewService:
+        return self.sidecar._review
+
+    @property
+    def tasks(self) -> TaskService:
+        return self.sidecar._tasks
 
     def get_project_dashboard_stats(self) -> ProjectStats:
         """Aggregate stats from all services for the dashboard."""

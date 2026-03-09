@@ -18,8 +18,8 @@ from pathlib import Path
 
 from sdkrouter._constants import HOMEPAGE_URL
 
-from .._config import Config, get_config
-from ..services.sidecar_service import SidecarService
+from cmdop_claude._config import Config, get_config
+from cmdop_claude.services.sidecar import SidecarService
 
 _API_KEY_ERROR_MSG = (
     "\n  SDKROUTER_API_KEY is missing or invalid.\n"
@@ -120,8 +120,8 @@ def main() -> None:
 
 def _maybe_prompt_api_key() -> None:
     """Interactively ask for SDKROUTER_API_KEY if not set and stdin is a TTY."""
-    from .._config import get_config
-    from ..models.cmdop_config import CmdopConfig
+    from cmdop_claude._config import get_config
+    from cmdop_claude.models.cmdop_config import CmdopConfig
 
     if not sys.stdin.isatty():
         return
