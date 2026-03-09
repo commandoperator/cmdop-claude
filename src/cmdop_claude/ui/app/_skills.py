@@ -16,6 +16,16 @@ def render_skills(client: Client) -> None:
     st.header("Skill Studio")
     st.markdown("Manage independent capabilities that Claude can invoke dynamically.")
 
+    tab_installed, tab_import = st.tabs(["📚 Installed", "📥 Import"])
+
+    with tab_installed:
+        _render_installed(client)
+
+    with tab_import:
+        _render_import(client)
+
+
+def _render_installed(client: Client) -> None:
     with st.expander("➕ Create New Skill"):
         with st.form("create_skill_form"):
             new_name = st.text_input("Skill Name (e.g., Code Reviewer)")
@@ -63,13 +73,19 @@ def render_skills(client: Client) -> None:
         st.info("No skills found in the `.claude/skills` directory.")
         return
 
+    query = st.text_input("🔍 Filter skills", placeholder="Search by name or description...", key="skills_filter")
+    if query:
+        skills = client.skills.search_skills(query)
+        if not skills:
+            st.info(f"No skills matching '{query}'.")
+            return
+
     for name, skill in skills.items():
         with st.container(border=True):
             st.subheader(f"✨ {skill.name or name}")
 
             if skill.description:
                 stoggle("View Skill Description", skill.description)
-
 
             st.write("---")
 
@@ -124,8 +140,6 @@ def render_skills(client: Client) -> None:
 
                 html_content = markdown.markdown(current_content)
 
-                is_dark = st.session_state.get('theme', 'dark') == 'dark'
-
                 jodit_config = {
                     "height": 500,
                     "theme": "dark" if is_dark else "default",
@@ -152,3 +166,34 @@ def render_skills(client: Client) -> None:
                             st.success("Prompt instructions saved!", icon="✅")
                     except Exception as e:
                         st.error(f"Failed to save content: {e}")
+
+
+def _render_import(client: Client) -> None:
+    st.markdown("### Import Skill from Local Path")
+    st.markdown("Copy a skill folder into `~/.claude/skills/`. The folder must contain a `SKILL.md` file.")
+
+    with st.form("import_skill_form"):
+        src_path = st.text_input(
+            "Skill folder path",
+            placeholder="/path/to/my-skill  or  ~/projects/skills/pdf",
+        )
+        submitted = st.form_submit_button("Preview & Import")
+
+        if submitted and src_path:
+            try:
+                name = client.skills.import_from_path(src_path.strip())
+                st.success(f"Skill **{name}** imported successfully!", icon="✅")
+                st.rerun()
+            except FileExistsError as e:
+                st.warning(str(e))
+            except ValueError as e:
+                st.error(str(e))
+            except Exception as e:
+                st.error(f"Import failed: {e}")
+
+    st.write("---")
+    st.markdown("### Community Skills")
+    st.info(
+        "Browse and install skills from the community registry — coming soon.\n\n"
+        "In the meantime: [github.com/commandoperator/cmdop-skills](https://github.com/commandoperator)"
+    )
