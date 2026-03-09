@@ -1,10 +1,24 @@
 """LLM provider routing configuration tab."""
 import os
+from typing import Any
 
+import httpx
 import streamlit as st
 import streamlit_shadcn_ui as ui
+from pydantic import BaseModel, ConfigDict
 
 from cmdop_claude.models.config.cmdop_config import CmdopConfig, LLMRouting, _LLM_ROUTING_DEFAULTS
+
+
+class _ModelInfo(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    name: str = ""
+
+    @property
+    def label(self) -> str:
+        return self.name if self.name and self.name != self.id else self.id
 
 _MODE_LABELS = {
     "openrouter": "OpenRouter — 300+ models (recommended)",
@@ -17,6 +31,32 @@ _ENV_VARS = {
     "openai": "OPENAI_API_KEY",
     "sdkrouter": "SDKROUTER_API_KEY",
 }
+
+
+def _fetch_models(routing: LLMRouting, key: str) -> list[_ModelInfo]:
+    """Fetch available models from provider /models endpoint.
+
+    Cached per (mode, key[:8]) in st.session_state to avoid repeated calls.
+    Returns empty list on any error — caller falls back to text_input.
+    """
+    cache_key = f"_llm_models_{routing.mode}_{key[:8] if key else 'nokey'}"
+    if cache_key in st.session_state:
+        cached: list[_ModelInfo] = st.session_state[cache_key]
+        return cached
+
+    url = routing.resolved_base_url.rstrip("/") + "/models"
+    try:
+        r = httpx.get(url, headers={"Authorization": f"Bearer {key}"}, timeout=8)
+        r.raise_for_status()
+        raw: Any = r.json()
+        # OpenAI-compatible: {"data": [...]} or just [...]
+        items: list[Any] = raw.get("data", raw) if isinstance(raw, dict) else raw
+        models = [_ModelInfo.model_validate(m) for m in items if isinstance(m, dict) and "id" in m]
+        models.sort(key=lambda m: m.id)
+        st.session_state[cache_key] = models
+        return models
+    except Exception:
+        return []
 
 
 def _mask_key(key: str) -> str:
@@ -128,12 +168,39 @@ def render_llm_routing() -> None:
 
     default_model = info["model"]
     current_model = routing.model if routing.mode == selected_mode else ""
-    new_model = st.text_input(
-        "Model override (optional)",
-        value=current_model,
-        placeholder=f"Default: {default_model}",
-        key="llm_routing_model",
-    )
+
+    # Fetch models list — show selectbox if available, text_input as fallback
+    fetch_key = new_key or os.getenv(env_var, "")
+    models = _fetch_models(
+        LLMRouting.model_validate({"mode": selected_mode, "apiKey": fetch_key}),
+        fetch_key,
+    ) if fetch_key else []
+
+    if models:
+        model_ids = [m.id for m in models]
+        # Insert current/default at top if not in list
+        for seed in (current_model, default_model):
+            if seed and seed not in model_ids:
+                model_ids.insert(0, seed)
+        try:
+            sel_idx = model_ids.index(current_model) if current_model in model_ids else model_ids.index(default_model)
+        except ValueError:
+            sel_idx = 0
+        new_model: str = st.selectbox(  # type: ignore[assignment]
+            "Model",
+            options=model_ids,
+            index=sel_idx,
+            key="llm_routing_model",
+            help=f"Default for this provider: {default_model}",
+        ) or default_model
+    else:
+        new_model = st.text_input(
+            "Model override (optional)",
+            value=current_model,
+            placeholder=f"Default: {default_model}",
+            key="llm_routing_model",
+            help="Set API key and click 'Test now' to load model list",
+        )
 
     col_save, col_test = st.columns([2, 1])
     with col_save:
