@@ -1,4 +1,5 @@
 """Skill service."""
+import importlib.resources
 import shutil
 from pathlib import Path
 from typing import Optional
@@ -63,8 +64,8 @@ class SkillService(BaseService):
 
     def create_skill(self, name: str, description: str = "") -> None:
         """Create a new skill directory with a boilerplate SKILL.md."""
-        # Convert name to safe directory name
-        dir_name = "".join([c if c.isalnum() else "_" for c in name.lower()])
+        # Convert name to kebab-case (agentskills.io standard: lowercase, hyphens only)
+        dir_name = "".join([c if c.isalnum() else "-" for c in name.lower()]).strip("-")
         skill_path_dir = self._skills_dir / dir_name
         skill_path_dir.mkdir(parents=True, exist_ok=True)
         
@@ -72,13 +73,13 @@ class SkillService(BaseService):
         if skill_path.exists():
             raise FileExistsError(f"Skill {dir_name} already exists.")
             
-        post = frontmatter.Post(
+        post = frontmatter.Post(  # type: ignore[call-arg]
             "Write your instructions here...",
             name=name,
             description=description,
-            **{"allowed-tools": ["Read", "Write"]},
-            **{"disable-model-invocation": False}
         )
+        post.metadata["allowed-tools"] = ["Read", "Write"]
+        post.metadata["disable-model-invocation"] = False
         skill_path.write_text(frontmatter.dumps(post), encoding="utf-8")
 
     def update_skill(self, skill_dir_name: str, data: SkillFrontmatter) -> None:
@@ -99,6 +100,37 @@ class SkillService(BaseService):
             for name, skill in self.list_skills().items()
             if q in (skill.name or "").lower() or q in (skill.description or "").lower()
         }
+
+    def install_bundled_skills(self, force: bool = False) -> list[str]:
+        """Copy all bundled skills from the package into ~/.claude/skills/.
+
+        Skips already-installed skills unless force=True.
+        Returns list of installed skill directory names.
+        """
+        try:
+            bundled_dir = importlib.resources.files("cmdop_claude") / "bundled_skills"
+            bundled_path = Path(str(bundled_dir))
+        except Exception:
+            return []
+
+        if not bundled_path.exists():
+            return []
+
+        self._skills_dir.mkdir(parents=True, exist_ok=True)
+        installed: list[str] = []
+
+        for skill_src in bundled_path.iterdir():
+            if not skill_src.is_dir() or not (skill_src / "SKILL.md").exists():
+                continue
+            dest = self._skills_dir / skill_src.name
+            if dest.exists() and not force:
+                continue
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(skill_src, dest)
+            installed.append(skill_src.name)
+
+        return installed
 
     def import_from_path(self, src: str) -> str:
         """Copy a skill folder from a local path into ~/.claude/skills/.

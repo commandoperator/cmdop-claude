@@ -1,4 +1,4 @@
-.PHONY: run dev install install-global setup dashboard test lint clean build publish publish-test patch minor major release claude commit sync-docs reindex reindex-docs embed-docs embed-docs-force
+.PHONY: run dev install install-global setup dashboard test lint clean build publish publish-test patch minor major release claude commit sync-docs reindex reindex-docs embed-docs embed-docs-force install-skills
 
 PORT ?= 8501
 PYTHON ?= python
@@ -19,8 +19,15 @@ install:
 install-global:
 	pip install .
 
-## Install deps and launch dashboard
-setup: install dashboard
+## Install deps, install bundled skills, and launch dashboard
+setup: install install-skills dashboard
+
+install-skills:
+	PYTHONPATH=./src:$$PYTHONPATH $(PYTHON) -c "\
+from cmdop_claude._config import Config; \
+from cmdop_claude.services.skills.skill_service import SkillService; \
+installed = SkillService(Config()).install_bundled_skills(); \
+print('Installed skills:', installed or 'none (already up to date)')"
 
 dashboard:
 	-pkill -f "streamlit run" 2>/dev/null; sleep 1

@@ -1,6 +1,6 @@
 [project]
 name = "cmdop-claude"
-version = "0.1.50"
+version = "0.1.51"
 description = "Self-maintaining .claude/ runtime — LLM-powered doc review, project map, task queue, auto-fix, and project init"
 readme = "README.md"
 license = "MIT"
@@ -60,7 +60,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-cmdop_claude = ["docs/docs.db", "docs/.gitkeep"]
+cmdop_claude = ["docs/docs.db", "docs/.gitkeep", "bundled_skills/**/*"]
 
 [tool.black]
 line-length = 88
