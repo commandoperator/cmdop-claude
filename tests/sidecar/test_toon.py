@@ -1,7 +1,7 @@
 """Tests for TOON serialization."""
 import pytest
 
-from cmdop_claude.sidecar.toon import paths_to_tree, to_grouped_prefix_blocks, to_toon
+from cmdop_claude.sidecar.scan.toon import paths_to_tree, to_grouped_prefix_blocks, to_toon
 
 
 # ── to_toon ──────────────────────────────────────────────────────────

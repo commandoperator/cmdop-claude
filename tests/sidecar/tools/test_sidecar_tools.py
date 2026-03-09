@@ -5,13 +5,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cmdop_claude.models.project_map import DirAnnotation, ProjectMap
+from cmdop_claude.models.docs.project_map import DirAnnotation, ProjectMap
 from cmdop_claude.models.sidecar import (
     ReviewItem,
     ReviewResult,
     SidecarStatus,
 )
-from cmdop_claude.models.task import SidecarTask, TaskPriority, TaskSource
+from cmdop_claude.models.skill.task import SidecarTask, TaskPriority, TaskSource
 
 
 @pytest.fixture(autouse=True)

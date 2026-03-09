@@ -6,13 +6,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cmdop_claude.models.git_context import (
+from cmdop_claude.models.docs.git_context import (
     GitContext,
     LLMRepoClassification,
     RepoInfo,
     RepoRole,
 )
-from cmdop_claude.sidecar.git_context import (
+from cmdop_claude.sidecar.git.git_context import (
     _BOT_EMAIL_RE,
     _cache_key,
     _find_repos,
@@ -146,7 +146,7 @@ def test_bot_email_re_does_not_match_human() -> None:
 
 
 def test_classify_sync_root_is_always_own(tmp_path: Path) -> None:
-    from cmdop_claude.sidecar.git_context import _classify_sync
+    from cmdop_claude.sidecar.git.git_context import _classify_sync
 
     mock_sdk = MagicMock()
     info = RepoInfo(path=".", remote_url="git@github.com:org/repo.git", has_commits=True)
@@ -156,7 +156,7 @@ def test_classify_sync_root_is_always_own(tmp_path: Path) -> None:
 
 
 def test_classify_sync_archive_path_is_always_external(tmp_path: Path) -> None:
-    from cmdop_claude.sidecar.git_context import _classify_sync
+    from cmdop_claude.sidecar.git.git_context import _classify_sync
 
     mock_sdk = MagicMock()
     info = RepoInfo(path="@archive/old-frontend", remote_url="", has_commits=True)
@@ -166,7 +166,7 @@ def test_classify_sync_archive_path_is_always_external(tmp_path: Path) -> None:
 
 
 def test_classify_sync_vendor_path_is_always_external() -> None:
-    from cmdop_claude.sidecar.git_context import _classify_sync
+    from cmdop_claude.sidecar.git.git_context import _classify_sync
 
     mock_sdk = MagicMock()
     info = RepoInfo(path="@vendor/some-lib", remote_url="https://github.com/lib/lib.git")

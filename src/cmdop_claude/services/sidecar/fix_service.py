@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from cmdop_claude.models.sidecar.fix import FixResult, LLMFixResponse
-from cmdop_claude.sidecar.prompts import FIX_SYSTEM, FIX_USER
+from cmdop_claude.sidecar.utils.prompts import FIX_SYSTEM, FIX_USER
 
 from .state import SidecarState
 
@@ -82,7 +82,7 @@ class FixService:
             target_path.write_text(new_content, encoding="utf-8")
             fix_result.applied = True
             self._clear_fix_cache(task_id)
-            from cmdop_claude.models.task import TaskStatus
+            from cmdop_claude.models.skill.task import TaskStatus
             tm.update_status(task_id, TaskStatus.completed)
 
         self._s.log_activity(

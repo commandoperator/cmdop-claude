@@ -1,4 +1,4 @@
-"""Application configuration — env vars override ~/.claude/cmdop.json."""
+"""Application configuration — env vars override ~/.claude/cmdop/config.json."""
 import os
 from pathlib import Path
 from typing import Optional
@@ -7,15 +7,24 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ._constants import ENV_PREFIX, DEFAULT_CLAUDE_DIR
-from .models.cmdop_config import CmdopConfig
+from cmdop_claude.models.config.cmdop_config import CmdopConfig
 
 # Loaded once at import time — cheap (just reads one JSON file)
 _cmdop: CmdopConfig = CmdopConfig.load()
 
 
 def _default_sdkrouter_key() -> str:
-    """env var → cmdop.json → test-api-key sentinel (LLM features fail gracefully)."""
-    return os.environ.get("SDKROUTER_API_KEY") or _cmdop.sdkrouter_api_key or "test-api-key"
+    """env var → llm_routing.api_key → legacy sdkrouterApiKey → empty."""
+    routing = _cmdop.llm_routing
+    # Check mode-specific env var first
+    env_key = os.environ.get(routing.env_var, "")
+    if env_key:
+        return env_key
+    # Then llm_routing.api_key
+    if routing.api_key:
+        return routing.api_key
+    # Legacy fallback: sdkrouterApiKey from config (for old configs not yet migrated)
+    return _cmdop.sdkrouter_api_key or ""
 
 
 def _default_smithery_key() -> str:

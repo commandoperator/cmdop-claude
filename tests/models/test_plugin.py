@@ -2,7 +2,7 @@
 import time
 from datetime import datetime, timezone
 
-from cmdop_claude.models.plugin import (
+from cmdop_claude.models.skill.plugin import (
     MCPPluginInfo,
     MCPToolInfo,
     PluginCache,

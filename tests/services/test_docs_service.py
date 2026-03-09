@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from cmdop_claude.services.docs_builder import build_db
-from cmdop_claude.services.docs_service import DocsService
-from cmdop_claude.models.cmdop_config import DocsSource
+from cmdop_claude.services.docs.docs_builder import build_db
+from cmdop_claude.services.docs.docs_service import DocsService
+from cmdop_claude.models.config.cmdop_config import DocsSource
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────

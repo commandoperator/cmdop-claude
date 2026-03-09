@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from cmdop_claude.sidecar.activity import ActivityLogger
+from cmdop_claude.sidecar.activity.activity import ActivityLogger
 
 
 @pytest.fixture

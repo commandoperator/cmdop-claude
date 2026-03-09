@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from cmdop_claude.sidecar.exclusions import (
+from cmdop_claude.sidecar.utils.exclusions import (
     GLOBAL_EXCLUDE_DIRS,
     GLOBAL_EXCLUDE_PATTERNS,
     SENSITIVE_FILES,

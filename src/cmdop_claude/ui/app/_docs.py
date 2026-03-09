@@ -7,8 +7,8 @@ import streamlit as st
 import streamlit_shadcn_ui as ui
 
 from cmdop_claude import Client
-from cmdop_claude.models.cmdop_config import CmdopConfig, DocsSource
-from cmdop_claude.services.docs_service import DocsService
+from cmdop_claude.models.config.cmdop_config import CmdopConfig, DocsSource
+from cmdop_claude.services.docs.docs_service import DocsService
 
 
 def _load_config() -> CmdopConfig:
@@ -33,7 +33,7 @@ def render_docs_browser(client: Client) -> None:  # noqa: ARG001
     st.markdown("Search and read documentation sources available to your agents via `docs_search` / `docs_get` MCP tools.")
 
     cfg = _load_config()
-    svc = DocsService(cfg.docs_sources, cfg.package_sources)
+    svc = DocsService(cfg.docs_sources)
 
     tab_search, tab_sources = st.tabs(["Search", "Sources"])
 
@@ -128,7 +128,7 @@ def render_docs_browser(client: Client) -> None:  # noqa: ARG001
     # ── Sources tab ───────────────────────────────────────────────
     with tab_sources:
         st.subheader("Configured sources")
-        st.markdown("Stored in `~/.claude/cmdop.json` → `docsPaths`. Agents search all sources.")
+        st.markdown("Stored in `~/.claude/cmdop/config.json` → `docsPaths`. Agents search all sources.")
 
         sources = list(cfg.docs_sources)
 

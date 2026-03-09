@@ -4,7 +4,7 @@ Self-maintaining `.claude/` runtime for Claude Code. Keeps your project document
 
 ![cmdop-claude dashboard](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/plugins.png)
 
-**~$0.003 per full cycle** (scan → review → fix → map) using DeepSeek V3.2 via SDKRouter.
+**~$0.003 per full cycle** (scan → review → fix → map) using DeepSeek V3.2.
 
 ---
 
@@ -12,12 +12,13 @@ Self-maintaining `.claude/` runtime for Claude Code. Keeps your project document
 
 Claude Code's `.claude/` folder is powerful but static. `cmdop-claude` makes it live:
 
-- **Documentation review** — LLM finds stale docs, contradictions between docs and actual code, coverage gaps, and abandoned plans. Runs automatically once per day.
+- **Documentation review** — LLM finds stale docs, contradictions between docs and actual code, coverage gaps, abandoned plans. Runs automatically once per day.
 - **Project map** — annotates directories with one-sentence descriptions. Cached by SHA256; only changed dirs cost tokens.
 - **Task queue** — review findings become structured tasks (`T-001.md`, `T-002.md`, ...). Top pending items injected into every prompt automatically.
 - **Auto-fix** — LLM generates targeted file edits for any task. Preview diff or apply directly.
-- **Project init** — bootstraps `CLAUDE.md` + rules from scratch for bare projects. Two-step LLM pipeline: cheap model selects which files to read → balanced model generates project-specific docs.
-- **Docs search** — agents call `docs_search` / `docs_get` MCP tools to find and read bundled documentation (djangocfg guides, etc.) with BM25 full-text search. No external service.
+- **Project init** — bootstraps `CLAUDE.md` + rules from scratch. Two-step LLM pipeline: cheap model selects which files to read → balanced model generates project-specific docs.
+- **Docs search (FTS5)** — `docs_search` / `docs_get` MCP tools with BM25 full-text search over bundled + custom doc sources. No external service.
+- **Docs semantic search** — `docs_semantic_search` MCP tool finds conceptually similar docs using embeddings + sqlite-vec. Build index with `make embed-docs`.
 - **Plugin browser** — searches Smithery + Official MCP registries (~1000 plugins), installs to `~/.claude.json`.
 
 Everything runs as Claude Code hooks. Zero manual steps after setup.
@@ -42,16 +43,21 @@ PostToolUse hook (Write|Edit)
 
 sidecar_init (MCP tool / CLI)
   ├─ Step 1 (cheap LLM): build file tree → select ≤25 most informative files
-  │   └─ prioritises: configs, entry points, core domain, Makefile
-  └─ Step 2 (balanced LLM): read selected files (40 lines each) → generate
+  └─ Step 2 (balanced LLM): read selected files → generate
       ├─ CLAUDE.md — project-specific, references actual files/libs
       └─ .claude/rules/*.md — tech-stack rules with real file citations
 
 docs_search / docs_get (MCP tools)
   ├─ bundled docs.db (SQLite FTS5) shipped inside the package
-  ├─ BM25 ranking + Porter stemmer ("migrat*" → migration/migrate/...)
+  ├─ BM25 ranking + Porter stemmer
   ├─ phrase search ("django migration"), prefix (migrat*), boolean (AND/NOT)
-  └─ user can add custom sources via ~/.claude/cmdop.json → docsPaths
+  └─ custom sources via ~/.claude/cmdop/config.json → docsPaths
+
+docs_semantic_search (MCP tool)
+  ├─ embeds query → text-embedding-3-small (1536 dims)
+  ├─ nearest-neighbor search in sqlite-vec (cosine distance)
+  ├─ index at ~/.claude/cmdop/vectors.db — built with make embed-docs
+  └─ incremental: SHA256 cache skips unchanged files
 ```
 
 ---
@@ -65,8 +71,6 @@ pip install cmdop-claude
 pip install cmdop-claude[ui]
 ```
 
-Get your API key at **[sdkrouter.com](https://sdkrouter.com)** (free tier available).
-
 ---
 
 ## Quick Start
@@ -79,7 +83,8 @@ python -m cmdop_claude.sidecar.hook setup
 
 `setup` does everything in one shot:
 
-- Saves your SDKRouter API key to `~/.claude/cmdop.json` (once for all projects)
+- Prompts for LLM provider (OpenRouter / OpenAI / SDKRouter) and API key
+- Saves config to `~/.claude/cmdop/config.json` (once for all projects)
 - Registers the MCP server for the current project via `claude mcp add`
 - Installs Claude Code hooks in `.claude/settings.json`
 - Configures `plansDirectory: ".claude/plans"`
@@ -113,6 +118,7 @@ python -m cmdop_claude.sidecar.hook unregister
 | `docs_search` | no | Full-text search across bundled + custom docs |
 | `docs_get` | no | Read a documentation file by path |
 | `docs_list` | no | List all indexed documentation files by source |
+| `docs_semantic_search` | no | Semantic vector search over docs (requires `make embed-docs`) |
 
 All sidecar tools are called **directly** — they are not deferred tools, do not search for them via ToolSearch.
 
@@ -171,11 +177,11 @@ make run              # http://localhost:8501
 make -C .claude dashboard  # from project with generated Makefile
 ```
 
-11 tabs: Health Auditor, Skill Studio, MCP Studio, Plugin Browser, **Docs Browser**, Hooks Manager, Sidecar Monitor, Project Map, Task Queue, Settings & Security, Trigger Graph.
+11 tabs: Health Auditor, Skill Studio, MCP Studio, Plugin Browser, Docs Browser, Hooks Manager, Sidecar Monitor, Project Map, Task Queue, Settings & Security, Trigger Graph.
 
-**Docs Browser** — search and read bundled documentation directly in the UI. Shows all indexed files grouped by source, with full-text search and inline markdown rendering.
+**Docs Browser** — search and read bundled documentation directly in the UI. Grouped by source, full-text search, inline markdown rendering.
 
-**Plugin Browser** searches Smithery + Official MCP registries (~1000 plugins) with background index caching.
+**Plugin Browser** — searches Smithery + Official MCP registries (~1000 plugins) with background index caching.
 
 | | |
 |---|---|
@@ -189,74 +195,71 @@ make -C .claude dashboard  # from project with generated Makefile
 
 ## Configuration
 
-### API Key
+`~/.claude/cmdop/config.json` — shared across all projects.
 
-Read in this order:
+### LLM Provider
 
-1. `SDKROUTER_API_KEY` env var
-2. `~/.claude/cmdop.json` → `sdkrouterApiKey` (written by `setup`)
-3. Falls back silently — LLM features skip, read-only tools still work
+Configured during `setup`. Supports three providers:
 
-```bash
-export SDKROUTER_API_KEY=your-key
-# or
-echo '{"sdkrouterApiKey": "your-key"}' > ~/.claude/cmdop.json
-```
+| Mode | Default Model | Embeddings endpoint | Key |
+|------|--------------|--------------------|----|
+| `openrouter` | deepseek/deepseek-v3-r1 | openrouter.ai/api/v1 | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| `openai` | gpt-4o-mini | api.openai.com/v1 | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| `sdkrouter` | deepseek/deepseek-v3.2 | llm.sdkrouter.com/v1 | [sdkrouter.com](https://sdkrouter.com) |
 
-### Docs Sources
+LLM and embedding requests go **directly** to the provider using your API key — no extra proxy. Other tools (CDN, vision, search) always use `api.sdkrouter.com`.
 
-By default, `docs_search` searches the bundled `docs.db` shipped with the package.
-Add custom sources in `~/.claude/cmdop.json`:
+Config is written as:
 
 ```json
 {
-  "sdkrouterApiKey": "...",
+  "llmRouting": {
+    "mode": "openrouter",
+    "apiKey": "sk-or-...",
+    "model": ""
+  }
+}
+```
+
+Or set via env var (`OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `SDKROUTER_API_KEY`) — takes precedence over config file.
+
+### Docs Sources
+
+By default, `docs_search` searches the bundled `docs.db` shipped with the package. Add custom sources:
+
+```json
+{
   "docsPaths": [
     {
-      "path": "/path/to/your/docs",
-      "description": "My project docs — API reference, guides"
-    },
-    {
-      "path": "/path/to/prebuilt.db",
-      "description": "Pre-built FTS5 index"
+      "path": "~/my-project/docs",
+      "description": "My project docs"
     }
   ]
 }
 ```
 
-Each source can be:
-- A **directory** of `.md` / `.mdx` files — indexed in-memory on demand
-- A **`.db` file** — pre-built SQLite FTS5 index, fastest option
+Each source can be a **directory** of `.md` / `.mdx` files (indexed on demand) or a pre-built **`.db` SQLite FTS5 index**.
 
-MDX files are automatically converted to clean Markdown (JSX/imports stripped).
+### Vector Index (Semantic Search)
 
-### Bundled Docs (for package maintainers)
-
-To bundle your own docs into the package, update `Makefile`:
-
-```makefile
-DOCS_SRC := /path/to/your/docs
-DOCS_DB  := src/cmdop_claude/docs/docs.db
-
-sync-docs:
-    python -c "from pathlib import Path; \
-    from cmdop_claude.services.docs_builder import build_db; \
-    build_db(Path('$(DOCS_SRC)'), Path('$(DOCS_DB)'), 'my-docs')"
+```bash
+make embed-docs        # embed all docs sources → ~/.claude/cmdop/vectors.db
+make embed-docs-force  # force re-embed (ignore SHA256 cache)
 ```
 
-Then run `make sync-docs` before `make publish`.
+Uses `text-embedding-3-small` (1536 dims) sent directly to your configured provider. All three providers (openrouter, openai, sdkrouter) support embeddings. The index is incremental: only changed files are re-embedded.
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SDKROUTER_API_KEY` | — | LLM backend key |
+| `OPENROUTER_API_KEY` | — | OpenRouter API key |
+| `OPENAI_API_KEY` | — | OpenAI API key |
+| `SDKROUTER_API_KEY` | — | SDKRouter API key |
 | `CMDOP_CLAUDE_DIR_PATH` | `.claude` | Path to .claude directory |
 | `CLAUDE_CP_SIDECAR_MODEL` | `deepseek/deepseek-v3.2` | Model for review/fix/map |
 | `CLAUDE_CP_SMITHERY_API_KEY` | — | Smithery registry key (optional) |
 | `CMDOP_DEBUG_MODE` | `false` | Debug logging |
-
-Init uses `Model.balanced(json=True)` from SDKRouter (best model for structured output). Everything else uses DeepSeek V3.2 (cheap, fast).
 
 ---
 
@@ -281,6 +284,10 @@ Init uses `Model.balanced(json=True)` from SDKRouter (best model for structured 
     ├── activity.jsonl       # action log (auto-rotates at 1000 lines)
     ├── usage.json           # daily token tracking
     └── suppressed.json      # acknowledged items
+
+~/.claude/cmdop/             # global state (shared across all projects)
+├── config.json              # LLM routing, docs sources, API keys
+└── vectors.db               # sqlite-vec vector index (built by make embed-docs)
 ```
 
 ---
@@ -293,7 +300,8 @@ src/cmdop_claude/
 ├── _client.py                  # Client entry point (lazy service props)
 ├── models/
 │   ├── base.py                 # CoreModel (strict Pydantic v2)
-│   ├── cmdop_config.py         # CmdopConfig, DocsSource — ~/.claude/cmdop.json
+│   ├── config/
+│   │   └── cmdop_config.py     # CmdopConfig, LLMRouting, DocsSource
 │   ├── git_context.py          # RepoInfo, GitContext, LLMRepoClassification
 │   ├── sidecar.py              # Review, Fix, Init, Map, ActivityEntry
 │   ├── project_map.py          # Map annotation models
@@ -301,33 +309,38 @@ src/cmdop_claude/
 │   ├── mcp.py                  # MCPServerCommand, MCPServerURL, MCPConfig
 │   └── plugin.py               # MCPPluginInfo, PluginCache
 ├── services/
-│   ├── docs_service.py         # DocsService — SQLite FTS5 search + MDX converter
-│   ├── docs_builder.py         # build_db — indexes docs into docs.db at publish time
+│   ├── docs/
+│   │   ├── docs_service.py     # DocsService — SQLite FTS5 search + MDX converter
+│   │   ├── docs_builder.py     # build_db — indexes docs into docs.db at publish time
+│   │   ├── embed_service.py    # EmbedService — text-embedding-3-small via SDKRouter
+│   │   └── vector_indexer.py   # VectorIndexer — sqlite-vec index build + search
 │   ├── plugin_service.py       # Registry search, install, background indexing
 │   ├── mcp_service.py          # MCP config read/write
 │   └── sidecar_service/
 │       ├── _base.py            # State, lock, scan, usage, activity
 │       ├── _review.py          # LLM review → review.md
 │       ├── _fix.py             # LLM fix for tasks
-│       ├── _init.py            # two-step LLM init pipeline (file select → generate)
+│       ├── _init.py            # two-step LLM init pipeline
 │       ├── _tasks.py           # Task CRUD
 │       ├── _mcp.py             # MCP registration + hooks + Makefile
 │       └── _status.py          # Status + map access
 ├── docs/
-│   └── docs.db                 # Bundled SQLite FTS5 index (djangocfg guides)
+│   └── docs.db                 # Bundled SQLite FTS5 index
 └── sidecar/
-    ├── server.py               # FastMCP server (14 tools)
+    ├── server.py               # FastMCP server (16 tools)
     ├── hook.py                 # CLI (11 commands)
+    ├── tools/
+    │   ├── docs_tools.py       # docs_search, docs_get, docs_list, docs_semantic_search
+    │   └── sidecar_tools.py    # sidecar_* tools
     ├── git_context.py          # GitContextService
-    ├── text_utils.py           # normalize_content
-    ├── tree_summarizer.py      # TreeSummarizer — chunked parallel LLM dir analysis
-    ├── toon.py                 # TOON serializer — token-efficient tree format
-    ├── merkle_cache.py         # MerkleCache — SHA256 dir hashing
+    ├── tree_summarizer.py      # TreeSummarizer
+    ├── toon.py                 # TOON serializer
+    ├── merkle_cache.py         # MerkleCache
     ├── mapper.py               # Project map generator
     ├── scanner.py              # .claude/ filesystem scanner
     ├── exclusions.py           # Junk filter + .gitignore integration
     ├── activity.py             # Activity logger (JSONL, auto-rotate)
-    ├── cache.py                # SHA256 annotation cache for map
+    ├── cache.py                # SHA256 annotation cache
     ├── tasks.py                # Task queue manager
     └── prompts.py              # LLM prompt templates
 ```
@@ -344,7 +357,8 @@ src/cmdop_claude/
 | Map generation (45 dirs) | ~5000 | ~$0.001 |
 | Map incremental (cached dirs) | 0 | $0.00 |
 | docs_search / docs_get | 0 | $0.00 |
-| Read-only operations | 0 | $0.00 |
+| docs_semantic_search (query only) | ~0.0001 | ~$0.000003 |
+| embed-docs (1000 files, one-time) | — | ~$0.01 |
 
 **Full cycle: ~$0.003. Daily estimate: ~$0.001–0.003/day.**
 
@@ -353,7 +367,7 @@ src/cmdop_claude/
 ## Testing
 
 ```bash
-make test   # 342+ tests
+make test   # 411+ tests
 ```
 
 ---

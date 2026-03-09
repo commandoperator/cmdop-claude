@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from cmdop_claude.models.project_map import (
+from cmdop_claude.models.docs.project_map import (
     DirAnnotation,
     LLMDirAnnotation,
     LLMMapResponse,

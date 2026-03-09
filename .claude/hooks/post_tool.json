@@ -1,5 +1,0 @@
-{
-  "events": ["post_tool_use"],
-  "script": "hooks/scripts/clean-json.sh",
-  "args": ["$TOOL_OUTPUT"]
-}

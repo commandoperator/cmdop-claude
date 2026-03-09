@@ -150,7 +150,7 @@ def service(test_project):
     root, claude_dir = test_project
 
     from cmdop_claude._config import Config
-    from cmdop_claude.services.sidecar_service import SidecarService
+    from cmdop_claude.services.sidecar import SidecarService
 
     config = Config(
         claude_dir_path=str(claude_dir),
@@ -478,7 +478,7 @@ class TestExclusionsInMapper:
         (root / "__pycache__" / "main.cpython-310.pyc").write_text("bytecode")
         (root / ".venv" / "lib").mkdir(parents=True)
 
-        from cmdop_claude.sidecar.exclusions import scan_project_dirs
+        from cmdop_claude.sidecar.utils.exclusions import scan_project_dirs
 
         dirs = scan_project_dirs(root, max_depth=3, max_dirs=50)
         dir_paths = [d.path for d in dirs]
@@ -492,7 +492,7 @@ class TestExclusionsInMapper:
         (root / ".env").write_text("SECRET_KEY=super_secret_123\nDB_URL=postgres://...\n")
         (root / "credentials.json").write_text('{"api_key": "sk-12345"}')
 
-        from cmdop_claude.sidecar.exclusions import is_sensitive_file
+        from cmdop_claude.sidecar.utils.exclusions import is_sensitive_file
 
         assert is_sensitive_file(".env")
         assert is_sensitive_file("credentials.json")
@@ -522,7 +522,7 @@ class TestMCPRegistration:
     """Test MCP server registration."""
 
     def test_register_and_check(self, service, monkeypatch) -> None:
-        import cmdop_claude.services.sidecar_service._mcp as _mcp_mod
+        import cmdop_claude.services.sidecar.mcp_reg_service as _mcp_mod
         from types import SimpleNamespace
 
         svc, root, claude_dir = service
@@ -545,7 +545,7 @@ class TestMCPRegistration:
         assert svc.is_mcp_registered() is True
 
     def test_unregister(self, service, monkeypatch) -> None:
-        import cmdop_claude.services.sidecar_service._mcp as _mcp_mod
+        import cmdop_claude.services.sidecar.mcp_reg_service as _mcp_mod
         from types import SimpleNamespace
 
         svc, root, claude_dir = service

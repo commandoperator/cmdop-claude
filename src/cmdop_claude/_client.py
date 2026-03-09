@@ -2,13 +2,13 @@ from pathlib import Path
 from typing import Optional
 
 from cmdop_claude._config import Config, configure, get_config
-from cmdop_claude.models.claude import ProjectStats
-from cmdop_claude.services.claude_service import ClaudeService
-from cmdop_claude.services.hooks_service import HooksService
-from cmdop_claude.services.mcp_service import MCPService
-from cmdop_claude.services.plugin_service import PluginService
+from cmdop_claude.models.claude.stats import ProjectStats
+from cmdop_claude.services.claude.claude_service import ClaudeService
+from cmdop_claude.services.claude.hooks_service import HooksService
+from cmdop_claude.services.claude.mcp_service import MCPService
+from cmdop_claude.services.plugins.plugin_service import PluginService
 from cmdop_claude.services.sidecar import SidecarService, TaskService, ReviewService
-from cmdop_claude.services.skill_service import SkillService
+from cmdop_claude.services.skills.skill_service import SkillService
 
 
 class Client:

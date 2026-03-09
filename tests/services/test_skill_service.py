@@ -7,7 +7,7 @@ import frontmatter
 import pytest
 
 from cmdop_claude._config import Config
-from cmdop_claude.services.skill_service import SkillService
+from cmdop_claude.services.skills.skill_service import SkillService
 
 
 @pytest.fixture()

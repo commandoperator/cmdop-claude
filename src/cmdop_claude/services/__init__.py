@@ -1,10 +1,10 @@
 """Services package."""
-from .base import BaseService, AsyncBaseService
-from .skill_service import SkillService
-from .claude_service import ClaudeService
-from .hooks_service import HooksService
-from .mcp_service import MCPService
-from .plugin_service import PluginService
+from cmdop_claude.services.base import BaseService, AsyncBaseService
+from cmdop_claude.services.skills.skill_service import SkillService
+from cmdop_claude.services.claude.claude_service import ClaudeService
+from cmdop_claude.services.claude.hooks_service import HooksService
+from cmdop_claude.services.claude.mcp_service import MCPService
+from cmdop_claude.services.plugins.plugin_service import PluginService
 
 __all__ = [
     "BaseService",

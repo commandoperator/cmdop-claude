@@ -1,13 +1,70 @@
-"""Typed model for ~/.claude/cmdop.json — global cmdop-claude configuration."""
+"""Typed model for ~/.claude/cmdop/config.json — global cmdop-claude configuration."""
 from __future__ import annotations
 
 import importlib.resources
 import json
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from cmdop_claude.models.base import CoreModel
+
+
+_LLM_ROUTING_DEFAULTS: dict[str, dict[str, str]] = {
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "model": "deepseek/deepseek-v3-r1",
+        "key_url": "https://openrouter.ai/keys",
+        "env_var": "OPENROUTER_API_KEY",
+    },
+    "openai": {
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini",
+        "key_url": "https://platform.openai.com/api-keys",
+        "env_var": "OPENAI_API_KEY",
+    },
+    "sdkrouter": {
+        "base_url": "https://llm.sdkrouter.com/v1",
+        "model": "deepseek/deepseek-v3.2",
+        "key_url": "https://sdkrouter.com",
+        "env_var": "SDKROUTER_API_KEY",
+    },
+}
+
+
+class LLMRouting(CoreModel):
+    """LLM provider routing configuration.
+
+    mode: "openrouter" | "openai" | "sdkrouter"
+    api_key: provider API key (persisted to config.json)
+    model: override default model for this mode
+    """
+
+    mode: str = Field(default="openrouter", alias="mode")
+    api_key: str = Field(default="", alias="apiKey")
+    model: str = Field(default="", alias="model")
+
+    model_config = {"populate_by_name": True}
+
+    @property
+    def _defaults(self) -> dict[str, str]:
+        return _LLM_ROUTING_DEFAULTS.get(self.mode, _LLM_ROUTING_DEFAULTS["openrouter"])
+
+    @property
+    def resolved_base_url(self) -> str:
+        return self._defaults["base_url"]
+
+    @property
+    def resolved_model(self) -> str:
+        return self.model or self._defaults["model"]
+
+    @property
+    def key_url(self) -> str:
+        return self._defaults["key_url"]
+
+    @property
+    def env_var(self) -> str:
+        return self._defaults["env_var"]
 
 
 class DocsSource(CoreModel):
@@ -25,24 +82,11 @@ class DocsSource(CoreModel):
 
     model_config = {"populate_by_name": True}
 
+    @property
+    def resolved_path(self) -> Path:
+        """Resolve ~, symlinks and relative segments to an absolute Path."""
+        return Path(self.path).expanduser().resolve()
 
-class PackageSource(CoreModel):
-    """A monorepo packages directory to index for documentation.
-
-    Each immediate subdirectory with a package.json or src/ is treated as one package.
-    LLM synthesizes docs from README + stories + export lines.
-    Index stored at ~/.claude/cmdop/pkg_index/<hash>/index.db.
-    """
-
-    path: str
-    description: str = ""
-    exclude_dirs: list[str] = Field(
-        default_factory=lambda: [
-            "@refactoring", "@dev", "@docs", "@sources", ".tmp",
-        ]
-    )
-
-    model_config = {"populate_by_name": True}
 
 
 def _default_docs_sources() -> list[DocsSource]:
@@ -69,7 +113,7 @@ def _coerce_docs_sources(value: object) -> list[DocsSource]:
     return result
 
 # Canonical location — never changes
-CMDOP_JSON_PATH = Path.home() / ".claude" / "cmdop.json"
+CMDOP_JSON_PATH = Path.home() / ".claude" / "cmdop" / "config.json"
 
 
 class CmdopPaths(CoreModel):
@@ -92,13 +136,19 @@ class CmdopPaths(CoreModel):
 
 
 class CmdopConfig(CoreModel):
-    """Typed representation of ~/.claude/cmdop.json.
+    """Typed representation of ~/.claude/cmdop/config.json.
 
     All fields have safe defaults — missing file → all defaults.
     Env vars in Config (pydantic-settings) override these values.
     """
 
-    # API keys
+    # LLM routing — provider + key + model (new unified field)
+    llm_routing: LLMRouting = Field(
+        default_factory=LLMRouting,
+        alias="llmRouting",
+    )
+
+    # API keys (legacy — kept for backwards compat and sdkrouter internal use)
     sdkrouter_api_key: str = Field(default="", alias="sdkrouterApiKey")
     smithery_api_key: str = Field(default="", alias="smitheryApiKey")
 
@@ -113,38 +163,29 @@ class CmdopConfig(CoreModel):
         description="Override for global cache dir. Default: ~/.claude/cmdop/",
     )
 
-    # Docs sources — bundled docs by default, override via docsPaths in cmdop.json
+    # Docs sources — bundled docs by default, override via docsPaths in config.json
     # Accepts list[str] (legacy) or list[{path, description}] (new format)
     docs_sources: list[DocsSource] = Field(
         default_factory=_default_docs_sources,
         alias="docsPaths",
     )
 
-    # Package sources — monorepo packages dirs, indexed via LLM synthesis
-    package_sources: list[PackageSource] = Field(
-        default_factory=list,
-        alias="packagesPaths",
-    )
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_key(cls, data: object) -> object:
+        """Migrate old sdkrouterApiKey → llmRouting if llmRouting not set."""
+        if not isinstance(data, dict):
+            return data
+        if "llmRouting" not in data and "sdkrouterApiKey" in data:
+            legacy_key = data["sdkrouterApiKey"]
+            if legacy_key and legacy_key != "test-api-key":
+                data["llmRouting"] = {"mode": "sdkrouter", "apiKey": legacy_key}
+        return data
 
     @field_validator("docs_sources", mode="before")
     @classmethod
     def coerce_docs_sources(cls, v: object) -> list[DocsSource]:
         return _coerce_docs_sources(v)
-
-    @field_validator("package_sources", mode="before")
-    @classmethod
-    def coerce_package_sources(cls, v: object) -> list[PackageSource]:
-        if not isinstance(v, list):
-            return []
-        result = []
-        for item in v:
-            if isinstance(item, str):
-                result.append(PackageSource(path=item))
-            elif isinstance(item, dict):
-                result.append(PackageSource(**item))
-            elif isinstance(item, PackageSource):
-                result.append(item)
-        return result
 
     @property
     def docs_paths(self) -> list[str]:
@@ -166,7 +207,7 @@ class CmdopConfig(CoreModel):
 
     @classmethod
     def load(cls) -> "CmdopConfig":
-        """Load from ~/.claude/cmdop.json. Returns defaults if missing/invalid."""
+        """Load from ~/.claude/cmdop/config.json. Returns defaults if missing/invalid."""
         try:
             if CMDOP_JSON_PATH.exists():
                 data = json.loads(CMDOP_JSON_PATH.read_text(encoding="utf-8"))
@@ -176,7 +217,7 @@ class CmdopConfig(CoreModel):
         return cls()
 
     def save(self) -> None:
-        """Write back to ~/.claude/cmdop.json (camelCase keys)."""
+        """Write back to ~/.claude/cmdop/config.json (camelCase keys)."""
         CMDOP_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
         data = self.model_dump(by_alias=True, exclude_defaults=True)
         # Always persist api key even if it's the only field
@@ -193,7 +234,13 @@ class CmdopConfig(CoreModel):
             json.dumps(existing, indent=2), encoding="utf-8"
         )
 
-    def set_api_key(self, key: str) -> None:
-        """Update sdkrouterApiKey in-place and persist."""
-        object.__setattr__(self, "sdkrouter_api_key", key)
+    def set_llm_routing(self, mode: str, api_key: str, model: str = "") -> None:
+        """Update llm_routing in-place and persist."""
+        routing = LLMRouting.model_validate({"mode": mode, "apiKey": api_key, "model": model})
+        object.__setattr__(self, "llm_routing", routing)
         self.save()
+
+    def set_api_key(self, key: str) -> None:
+        """Legacy: update sdkrouterApiKey and migrate to llmRouting=sdkrouter."""
+        object.__setattr__(self, "sdkrouter_api_key", key)
+        self.set_llm_routing("sdkrouter", key)

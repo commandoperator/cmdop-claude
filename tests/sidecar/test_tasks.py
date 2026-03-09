@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from cmdop_claude.models.sidecar import ReviewItem
-from cmdop_claude.models.task import SidecarTask, TaskPriority, TaskSource, TaskStatus
-from cmdop_claude.sidecar.tasks import TaskManager
+from cmdop_claude.models.skill.task import SidecarTask, TaskPriority, TaskSource, TaskStatus
+from cmdop_claude.sidecar.tasks.tasks import TaskManager
 
 
 @pytest.fixture()

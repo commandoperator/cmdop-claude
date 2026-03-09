@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cmdop_claude.models.skill import SkillFrontmatter
+from cmdop_claude.models.skill.skill import SkillFrontmatter
 
 
 @pytest.fixture(autouse=True)

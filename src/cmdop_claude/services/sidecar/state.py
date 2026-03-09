@@ -15,12 +15,12 @@ from cmdop_claude._config import Config
 from cmdop_claude.infrastructure.llm import LLMCaller
 from cmdop_claude.infrastructure.storage import JSONStorage
 from cmdop_claude.models.sidecar.scan import DocScanResult
-from cmdop_claude.sidecar.activity import ActivityLogger
-from cmdop_claude.sidecar.scanner import full_scan
+from cmdop_claude.sidecar.activity.activity import ActivityLogger
+from cmdop_claude.sidecar.scan.scanner import full_scan
 
 if TYPE_CHECKING:
-    from cmdop_claude.sidecar.mapper import ProjectMapper
-    from cmdop_claude.sidecar.tasks import TaskManager
+    from cmdop_claude.sidecar.map.mapper import ProjectMapper
+    from cmdop_claude.sidecar.tasks.tasks import TaskManager
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,12 @@ _SDKROUTER_HELP = (
     f"Get your API key at {HOMEPAGE_URL} → set SDKROUTER_API_KEY env variable. "
     "Sidecar LLM features (review, fix, map, init) require a valid key."
 )
+
+_ROUTING_HELP = {
+    "openrouter": "Get your OpenRouter key at https://openrouter.ai/keys → set OPENROUTER_API_KEY",
+    "openai": "Get your OpenAI key at https://platform.openai.com/api-keys → set OPENAI_API_KEY",
+    "sdkrouter": f"Get your key at {HOMEPAGE_URL} → set SDKROUTER_API_KEY",
+}
 
 
 class SidecarState:
@@ -40,12 +46,20 @@ class SidecarState:
         self.usage_file = self.sidecar_dir / "usage.json"
         self.suppress_file = self.sidecar_dir / "suppressed.json"
 
-        if not config.sdkrouter_api_key:
-            logger.debug("SDKROUTER_API_KEY not set. %s", _SDKROUTER_HELP)
+        routing = config.cmdop.llm_routing
+        resolved_key = config.sdkrouter_api_key  # already resolved via _default_sdkrouter_key
 
-        self.sdk = SDKRouter(api_key=config.sdkrouter_api_key)
+        if not resolved_key:
+            help_msg = _ROUTING_HELP.get(routing.mode, _SDKROUTER_HELP)
+            logger.debug("No API key configured for '%s' routing. %s", routing.mode, help_msg)
+
+        self.sdk = SDKRouter(
+            api_key=resolved_key or "no-key",
+            llm_url=routing.resolved_base_url,
+            use_self_hosted=False,
+        )
         self.llm = LLMCaller(self.sdk)
-        self.model = config.sidecar_model
+        self.model = routing.resolved_model if routing.mode != "sdkrouter" else config.sidecar_model
         self.activity = ActivityLogger(self.sidecar_dir)
 
         self._usage_storage = JSONStorage(self.usage_file)
@@ -126,13 +140,13 @@ class SidecarState:
 
     def get_mapper(self) -> ProjectMapper:
         if self._mapper is None:
-            from cmdop_claude.sidecar.mapper import ProjectMapper
+            from cmdop_claude.sidecar.map.mapper import ProjectMapper
             project_root = self.claude_dir.parent
             self._mapper = ProjectMapper(self.sdk, project_root, self.sidecar_dir, self.model)
         return self._mapper
 
     def get_task_manager(self) -> TaskManager:
         if self._task_mgr is None:
-            from cmdop_claude.sidecar.tasks import TaskManager
+            from cmdop_claude.sidecar.tasks.tasks import TaskManager
             self._task_mgr = TaskManager(self.sidecar_dir / "tasks")
         return self._task_mgr

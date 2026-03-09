@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cmdop_claude.models.project_map import DirAnnotation, ProjectMap
+from cmdop_claude.models.docs.project_map import DirAnnotation, ProjectMap
 
 
 @pytest.fixture()

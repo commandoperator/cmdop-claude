@@ -12,7 +12,7 @@ from cmdop_claude.models.sidecar.review import (
     ReviewResult,
 )
 from cmdop_claude.models.sidecar.scan import DocScanResult
-from cmdop_claude.sidecar.prompts import REVIEW_SYSTEM, REVIEW_USER
+from cmdop_claude.sidecar.utils.prompts import REVIEW_SYSTEM, REVIEW_USER
 
 from .state import SidecarState
 

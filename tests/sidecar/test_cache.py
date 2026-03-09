@@ -1,8 +1,8 @@
 """Tests for annotation cache."""
 from pathlib import Path
 
-from cmdop_claude.sidecar.cache import AnnotationCache, dir_content_hash
-from cmdop_claude.sidecar.exclusions import DirInfo
+from cmdop_claude.sidecar.cache.cache import AnnotationCache, dir_content_hash
+from cmdop_claude.sidecar.utils.exclusions import DirInfo
 
 
 # ── dir_content_hash ─────────────────────────────────────────────────

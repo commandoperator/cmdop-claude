@@ -4,7 +4,7 @@ from cmdop_claude.models.config.cmdop_config import (
     CmdopPaths,
     CMDOP_JSON_PATH,
     DocsSource,
-    PackageSource,
+    LLMRouting,
 )
 from cmdop_claude.models.config.mcp import (
     MCPConfig,
@@ -19,7 +19,7 @@ __all__ = [
     "CmdopPaths",
     "CMDOP_JSON_PATH",
     "DocsSource",
-    "PackageSource",
+    "LLMRouting",
     "MCPConfig",
     "ClaudeSettings",
     "MCPServerConfig",

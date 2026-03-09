@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING
 from sdkrouter import Model
 
 from cmdop_claude.models.sidecar.init import InitResult, LLMFileSelectResponse, LLMInitResponse
-from cmdop_claude.sidecar._sidecar_section import inject_sidecar_workflow
-from cmdop_claude.sidecar.prompts import FILE_SELECT_SYSTEM, FILE_SELECT_USER, INIT_SYSTEM, INIT_USER
-from cmdop_claude.sidecar.text_utils import normalize_content
-from cmdop_claude.sidecar.tree_summarizer import TreeSummarizer
+from cmdop_claude.sidecar.scan._sidecar_section import inject_sidecar_workflow
+from cmdop_claude.sidecar.utils.prompts import FILE_SELECT_SYSTEM, FILE_SELECT_USER, INIT_SYSTEM, INIT_USER
+from cmdop_claude.sidecar.utils.text_utils import normalize_content
+from cmdop_claude.sidecar.scan.tree_summarizer import TreeSummarizer
 
 from .state import SidecarState
 
@@ -66,7 +66,7 @@ class InitService:
         own_dirs: set[str] | None = None
         git_ctx_block = ""
         try:
-            from cmdop_claude.sidecar.git_context import GitContextService
+            from cmdop_claude.sidecar.git.git_context import GitContextService
             git_ctx = GitContextService(self._s.sdk).collect(
                 project_root, claude_dir=self._s.claude_dir
             )
@@ -82,7 +82,7 @@ class InitService:
         file_tree = _build_file_tree(project_root, allowed_top_dirs=own_dirs)
         if summarizer.should_summarize(file_tree):
             try:
-                from cmdop_claude.sidecar.merkle_cache import MerkleCache
+                from cmdop_claude.sidecar.cache.merkle_cache import MerkleCache
                 _cache_path = self._s.claude_dir / ".sidecar" / "merkle_cache.json"
                 _merkle_cache = MerkleCache(_cache_path, Model.cheap(json=True))
                 summaries = summarizer.summarize(
@@ -230,7 +230,7 @@ def _read_readme(root: Path, max_chars: int = 800) -> str:
 
 
 def _find_all_project_configs(root: Path, max_depth: int = 5) -> list[dict]:
-    from cmdop_claude.sidecar.exclusions import should_exclude_dir, load_gitignore
+    from cmdop_claude.sidecar.utils.exclusions import should_exclude_dir, load_gitignore
     gitignore = load_gitignore(root)
     configs: list[dict] = []
 
@@ -261,7 +261,7 @@ def _find_all_project_configs(root: Path, max_depth: int = 5) -> list[dict]:
 def _find_makefiles(
     root: Path, max_depth: int = 4, allowed_top_dirs: set[str] | None = None
 ) -> str:
-    from cmdop_claude.sidecar.exclusions import should_exclude_dir, load_gitignore
+    from cmdop_claude.sidecar.utils.exclusions import should_exclude_dir, load_gitignore
     gitignore = load_gitignore(root)
     all_targets: list[str] = []
 
@@ -301,7 +301,7 @@ def _find_makefiles(
 def _build_file_tree(
     root: Path, allowed_top_dirs: set[str] | None = None, max_depth: int = 5
 ) -> str:
-    from cmdop_claude.sidecar.exclusions import should_exclude_dir, load_gitignore
+    from cmdop_claude.sidecar.utils.exclusions import should_exclude_dir, load_gitignore
     gitignore = load_gitignore(root)
     lines: list[str] = []
 
@@ -339,7 +339,7 @@ def _build_file_tree(
 def _read_selected_files(
     root: Path, selected: list[str], lines_per_file: int = 40
 ) -> str:
-    from cmdop_claude.sidecar.exclusions import is_sensitive_content, is_sensitive_file
+    from cmdop_claude.sidecar.utils.exclusions import is_sensitive_content, is_sensitive_file
     snippets: list[str] = []
     for rel_path in selected:
         fpath = root / rel_path
@@ -415,10 +415,9 @@ def _build_fallback_claude_md(
 
 def _build_docs_block() -> tuple[str, str, str]:
     try:
-        from cmdop_claude.models.cmdop_config import CmdopConfig
+        from cmdop_claude.models.config.cmdop_config import CmdopConfig
         cfg = CmdopConfig.load()
         sources = cfg.docs_sources
-        pkg_sources = cfg.package_sources
     except Exception:
         return "(no documentation sources configured)", "", ""
 
@@ -426,9 +425,6 @@ def _build_docs_block() -> tuple[str, str, str]:
     for s in sources:
         desc = s.description or s.path
         lines.append(f"- **{desc}** — `docs_search` / `docs_get` MCP tools")
-    for p in pkg_sources:
-        desc = p.description or p.path
-        lines.append(f"- **{desc}** (packages) — `docs_search` / `docs_reindex` MCP tools")
 
     docs_block = "\n".join(lines) if lines else "(no documentation sources configured)"
 
@@ -440,13 +436,4 @@ def _build_docs_block() -> tuple[str, str, str]:
             "Call `docs_get` with the returned path to read the full file."
         )
 
-    packages_hint = ""
-    if pkg_sources:
-        pkg_names = ", ".join(p.description or p.path for p in pkg_sources if p.description or p.path)
-        packages_hint = (
-            f"Package docs indexed via `docs_reindex` ({pkg_names}). "
-            "Use `docs_search` to find components/hooks by name or description. "
-            "Run `docs_reindex()` after adding new packages."
-        )
-
-    return docs_block, docs_workflow_hint, packages_hint
+    return docs_block, docs_workflow_hint, ""

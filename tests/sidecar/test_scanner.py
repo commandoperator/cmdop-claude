@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cmdop_claude.sidecar.scanner import (
+from cmdop_claude.sidecar.scan.scanner import (
     full_scan,
     scan_dependencies,
     scan_doc_files,
@@ -140,7 +140,7 @@ def test_scan_git_log_success() -> None:
         "stdout": "2026-03-01 feat: add sidecar\n2026-02-28 fix: typo\n",
     })()
 
-    with patch("cmdop_claude.sidecar.scanner.subprocess.run", return_value=mock_result):
+    with patch("cmdop_claude.sidecar.scan.scanner.subprocess.run", return_value=mock_result):
         result = scan_git_log(max_entries=5)
 
     assert len(result) == 2
@@ -150,14 +150,14 @@ def test_scan_git_log_success() -> None:
 def test_scan_git_log_failure() -> None:
     mock_result = type("R", (), {"returncode": 1, "stdout": ""})()
 
-    with patch("cmdop_claude.sidecar.scanner.subprocess.run", return_value=mock_result):
+    with patch("cmdop_claude.sidecar.scan.scanner.subprocess.run", return_value=mock_result):
         result = scan_git_log()
 
     assert result == []
 
 
 def test_scan_git_log_exception() -> None:
-    with patch("cmdop_claude.sidecar.scanner.subprocess.run", side_effect=OSError("no git")):
+    with patch("cmdop_claude.sidecar.scan.scanner.subprocess.run", side_effect=OSError("no git")):
         result = scan_git_log()
 
     assert result == []
@@ -209,7 +209,7 @@ def test_full_scan_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "api").mkdir()
 
-    with patch("cmdop_claude.sidecar.scanner.scan_git_log", return_value=["2026-03-01 init"]):
+    with patch("cmdop_claude.sidecar.scan.scanner.scan_git_log", return_value=["2026-03-01 init"]):
         result = full_scan(claude_dir)
 
     assert len(result.files) == 2  # CLAUDE.md + style.md

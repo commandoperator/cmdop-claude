@@ -3,7 +3,7 @@ import streamlit as st
 import streamlit_shadcn_ui as ui
 
 from cmdop_claude import Client
-from cmdop_claude.models.mcp import MCPServerCommand, MCPServerURL, MCPServerConfig
+from cmdop_claude.models.config.mcp import MCPServerCommand, MCPServerURL, MCPServerConfig
 
 
 def _format_server_config(cfg: MCPServerConfig) -> str:
@@ -51,7 +51,7 @@ def render_mcp_studio(client: Client) -> None:
             submitted = st.form_submit_button("Connect Server")
             if submitted and s_name and s_cmd:
                 try:
-                    from cmdop_claude.models.mcp import MCPServerCommand
+                    from cmdop_claude.models.config.mcp import MCPServerCommand
                     new_srv = MCPServerCommand(command=s_cmd, args=s_args.split() if s_args else [])
                     if s_scope == "Project":
                         cfg = client.mcp.get_project_mcp_config()
@@ -128,7 +128,7 @@ def render_plugin_browser(client: Client) -> None:
         else:
             st.caption(f"{len(installed_names)} installed plugin(s)")
             # Try to find plugin info from cache for richer display
-            from cmdop_claude.services.plugin_service import _OFFICIAL_INDEX_KEY
+            from cmdop_claude.services.plugins.plugin_service import _OFFICIAL_INDEX_KEY
             index = client.plugins._get_cached(_OFFICIAL_INDEX_KEY) or []
             index_map = {p.name: p for p in index}
 

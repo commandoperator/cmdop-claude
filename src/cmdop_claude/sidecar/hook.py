@@ -16,15 +16,12 @@ import sys
 import time
 from pathlib import Path
 
-from sdkrouter._constants import HOMEPAGE_URL
-
 from cmdop_claude._config import Config, get_config
 from cmdop_claude.services.sidecar import SidecarService
 
 _API_KEY_ERROR_MSG = (
-    "\n  SDKROUTER_API_KEY is missing or invalid.\n"
-    f"  Get your API key at: {HOMEPAGE_URL}\n"
-    "  Then: export SDKROUTER_API_KEY=your-key-here\n"
+    "\n  API key is missing or invalid.\n"
+    "  Run 'cmdop setup' to configure your LLM provider.\n"
 )
 
 
@@ -118,30 +115,64 @@ def main() -> None:
         sys.exit(1)
 
 
-def _maybe_prompt_api_key() -> None:
-    """Interactively ask for SDKROUTER_API_KEY if not set and stdin is a TTY."""
-    from cmdop_claude._config import get_config
-    from cmdop_claude.models.cmdop_config import CmdopConfig
+_PROVIDER_CHOICES = {
+    "1": "openrouter",
+    "2": "openai",
+    "3": "sdkrouter",
+}
+
+_PROVIDER_LABELS = {
+    "openrouter": "OpenRouter  — 300+ models (deepseek, gpt-4o, claude), pay-per-use",
+    "openai":     "OpenAI     — GPT-4o, o3, official API",
+    "sdkrouter":  "SDKRouter  — Internal use",
+}
+
+
+def _maybe_prompt_llm_routing() -> None:
+    """Interactively configure LLM routing if no API key is set."""
+    from cmdop_claude.models.config.cmdop_config import CmdopConfig
 
     if not sys.stdin.isatty():
         return
-    if get_config().sdkrouter_api_key:
+
+    cfg = CmdopConfig.load()
+    if cfg.llm_routing.api_key or get_config().sdkrouter_api_key:
         return
+
     print()
-    print("  SDKROUTER_API_KEY is not set — LLM features won't work.")
-    print("  Get your key at: https://sdkrouter.com")
+    print("  LLM features require an API key. Choose your provider:")
+    for num, mode in _PROVIDER_CHOICES.items():
+        print(f"  {num}) {_PROVIDER_LABELS[mode]}")
+    print()
+
     try:
-        key = input("  Enter API key (Enter to skip): ").strip()
+        choice = input("  Choice [1/2/3] (Enter to skip): ").strip()
     except (EOFError, KeyboardInterrupt):
         return
+
+    mode = _PROVIDER_CHOICES.get(choice)
+    if not mode:
+        return
+
+    from cmdop_claude.models.config.cmdop_config import _LLM_ROUTING_DEFAULTS
+    info = _LLM_ROUTING_DEFAULTS[mode]
+    print(f"  Get your key at: {info['key_url']}")
+    try:
+        key = input("  Paste API key (Enter to skip): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return
+
     if key:
-        CmdopConfig.load().set_api_key(key)
-        print("  Saved to ~/.claude/cmdop.json")
+        cfg.set_llm_routing(mode, key)
+        from cmdop_claude.models.config.cmdop_config import LLMRouting
+        routing = LLMRouting.model_validate({"mode": mode, "apiKey": key})
+        print(f"  Saved. Provider: {mode} | Default model: {routing.resolved_model}")
+        print("  Tip: override model via llmRouting.model in ~/.claude/cmdop/config.json")
 
 
 def _setup_and_init(sidecar: SidecarService, config: "Config") -> None:
     """Setup project hooks and auto-init if CLAUDE.md doesn't exist."""
-    _maybe_prompt_api_key()
+    _maybe_prompt_llm_routing()
     hooks_added = sidecar.setup_project_hooks()
     if hooks_added:
         for h in hooks_added:

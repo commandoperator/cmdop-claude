@@ -5,13 +5,13 @@ import json
 import subprocess
 import sys
 
-from cmdop_claude.models.cmdop_config import CmdopConfig
+from cmdop_claude.models.config.cmdop_config import CmdopConfig
 
 from .state import SidecarState
 
 
 def save_api_key(key: str) -> None:
-    """Save SDKROUTER_API_KEY to ~/.claude/cmdop.json via CmdopConfig."""
+    """Save SDKROUTER_API_KEY to ~/.claude/cmdop/config.json via CmdopConfig."""
     CmdopConfig.load().set_api_key(key)
 
 

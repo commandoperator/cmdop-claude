@@ -1,7 +1,7 @@
 """Tests for inject_sidecar_workflow."""
 import pytest
 
-from cmdop_claude.sidecar._sidecar_section import inject_sidecar_workflow
+from cmdop_claude.sidecar.scan._sidecar_section import inject_sidecar_workflow
 
 
 def test_replaces_existing_workflow_section():

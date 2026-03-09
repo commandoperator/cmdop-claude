@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from cmdop_claude.models.task import (
+from cmdop_claude.models.skill.task import (
     SidecarTask,
     TaskPriority,
     TaskQueue,

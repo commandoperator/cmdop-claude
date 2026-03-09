@@ -5,14 +5,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cmdop_claude.models.project_map import (
+from cmdop_claude.models.docs.project_map import (
     DirAnnotation,
     LLMDirAnnotation,
     LLMMapResponse,
     MapConfig,
     ProjectMap,
 )
-from cmdop_claude.sidecar.mapper import ProjectMapper, _ENTRY_NAMES
+from cmdop_claude.sidecar.map.mapper import ProjectMapper, _ENTRY_NAMES
 
 
 @pytest.fixture()
@@ -205,7 +205,7 @@ def test_detect_changes_with_git(mock_sdk, project) -> None:
         "stdout": "src/main.py\nsrc/models/user.py\ntests/test_main.py\n",
     })()
 
-    with patch("cmdop_claude.sidecar.mapper.subprocess.run", return_value=mock_result):
+    with patch("cmdop_claude.sidecar.map.mapper.subprocess.run", return_value=mock_result):
         changed = mapper.detect_changes()
 
     assert "src" in changed
@@ -217,7 +217,7 @@ def test_detect_changes_no_git(mock_sdk, project) -> None:
     root, claude_dir, sidecar_dir = project
     mapper = ProjectMapper(mock_sdk, root, sidecar_dir)
 
-    with patch("cmdop_claude.sidecar.mapper.subprocess.run", side_effect=OSError("no git")):
+    with patch("cmdop_claude.sidecar.map.mapper.subprocess.run", side_effect=OSError("no git")):
         changed = mapper.detect_changes()
 
     assert changed == []

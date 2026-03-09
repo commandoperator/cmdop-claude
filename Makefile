@@ -1,4 +1,4 @@
-.PHONY: run dev install install-global test lint clean build publish publish-test patch minor major release claude commit sync-docs
+.PHONY: run dev install install-global setup dashboard test lint clean build publish publish-test patch minor major release claude commit sync-docs reindex reindex-docs embed-docs embed-docs-force
 
 PORT ?= 8501
 PYTHON ?= python
@@ -18,6 +18,13 @@ install:
 
 install-global:
 	pip install .
+
+## Install deps and launch dashboard
+setup: install dashboard
+
+dashboard:
+	-pkill -f "streamlit run" 2>/dev/null; sleep 1
+	PYTHONPATH=./src:$$PYTHONPATH $(PYTHON) -m streamlit run src/cmdop_claude/ui/main.py --server.port $(PORT)
 
 test:
 	python -m pytest tests/ -q --ignore=tests/e2e
@@ -68,9 +75,26 @@ sync-docs:
 	@echo "Building docs FTS5 index from $(DOCS_SRC)..."
 	@PYTHONPATH=./src python -c "\
 from pathlib import Path; \
-from cmdop_claude.services.docs_builder import build_db; \
+from cmdop_claude.services.docs.docs_builder import build_db; \
 n = build_db(Path('$(DOCS_SRC)'), Path('$(DOCS_DB)'), 'djangocfg'); \
 print(f'Done. Indexed {n} files → $(DOCS_DB)')"
+
+# ── Docs reindex ─────────────────────────────────────────────────────
+
+## Rebuild FTS5 index for all docs_sources in ~/.claude/cmdop.json
+reindex: reindex-docs
+
+## Rebuild FTS5 index for all docs_sources in ~/.claude/cmdop.json
+reindex-docs:
+	PYTHONPATH=./src:$$PYTHONPATH $(PYTHON) scripts/reindex_docs.py
+
+## Embed docs into vector index at ~/.claude/cmdop/vectors.db (requires API key)
+embed-docs:
+	PYTHONPATH=./src:$$PYTHONPATH $(PYTHON) scripts/embed_docs.py
+
+## Force re-embed all docs (ignore SHA256 cache)
+embed-docs-force:
+	PYTHONPATH=./src:$$PYTHONPATH $(PYTHON) scripts/embed_docs.py --force
 
 # ── Build & Publish ──────────────────────────────────────────────────
 

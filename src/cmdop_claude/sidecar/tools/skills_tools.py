@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from cmdop_claude._config import get_config
-from cmdop_claude.services.skill_service import SkillService
+from cmdop_claude.services.skills.skill_service import SkillService
 
 
 def _get_service() -> SkillService:

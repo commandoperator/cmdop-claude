@@ -150,7 +150,7 @@ def real_project(tmp_path: Path):
     claude_dir = _create_test_project(root)
 
     from cmdop_claude._config import Config
-    from cmdop_claude.services.sidecar_service import SidecarService
+    from cmdop_claude.services.sidecar import SidecarService
 
     config = Config(
         claude_dir_path=str(claude_dir),

@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cmdop_claude._config import Config
-from cmdop_claude.models.plugin import MCPPluginInfo, MCPToolInfo, PluginCacheStore
-from cmdop_claude.services.plugin_service import PluginService, _OFFICIAL_INDEX_KEY
+from cmdop_claude.models.skill.plugin import MCPPluginInfo, MCPToolInfo, PluginCacheStore
+from cmdop_claude.services.plugins.plugin_service import PluginService, _OFFICIAL_INDEX_KEY
 
 
 def _make_service(tmp_path: Path, **kwargs):
@@ -38,7 +38,7 @@ def service(tmp_path: Path):
 def claude_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Redirect ~/.claude.json to tmp_path."""
     cj = tmp_path / ".claude.json"
-    monkeypatch.setattr("cmdop_claude.services.plugin_service.Path.home", lambda: tmp_path)
+    monkeypatch.setattr("cmdop_claude.services.plugins.plugin_service.Path.home", lambda: tmp_path)
     return cj
 
 
@@ -71,7 +71,7 @@ def _mock_urlopen(response_data: bytes):
     return mock_resp
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_search_smithery(mock_urlopen, service) -> None:
     mock_urlopen.return_value = _mock_urlopen(SMITHERY_RESPONSE)
 
@@ -85,7 +85,7 @@ def test_search_smithery(mock_urlopen, service) -> None:
     assert results[0].tools[0].name == "send_message"
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_search_smithery_no_key(mock_urlopen, tmp_path: Path) -> None:
     """Without smithery_api_key, return empty list silently."""
     svc = _make_service(tmp_path, smithery_api_key="")
@@ -96,7 +96,7 @@ def test_search_smithery_no_key(mock_urlopen, tmp_path: Path) -> None:
     mock_urlopen.assert_not_called()
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_search_smithery_http_error(mock_urlopen, service) -> None:
     mock_urlopen.side_effect = Exception("Connection refused")
 
@@ -128,7 +128,7 @@ OFFICIAL_RESPONSE = json.dumps({
 }).encode()
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_search_official_with_index(mock_urlopen, service) -> None:
     """When index is cached, search_official filters from it instantly."""
     # Pre-populate the index cache
@@ -144,7 +144,7 @@ def test_search_official_with_index(mock_urlopen, service) -> None:
     mock_urlopen.assert_not_called()
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_search_official_fallback(mock_urlopen, service) -> None:
     """Without cached index, falls back to fetching 1 page."""
     mock_urlopen.return_value = _mock_urlopen(OFFICIAL_RESPONSE)
@@ -156,7 +156,7 @@ def test_search_official_fallback(mock_urlopen, service) -> None:
     assert mock_urlopen.call_count == 1
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_search_official_http_error(mock_urlopen, service) -> None:
     mock_urlopen.side_effect = Exception("Timeout")
 
@@ -165,7 +165,7 @@ def test_search_official_http_error(mock_urlopen, service) -> None:
     assert results == []
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_background_index_fetch(mock_urlopen, tmp_path: Path) -> None:
     """_fetch_official_index populates the index cache."""
     mock_urlopen.return_value = _mock_urlopen(OFFICIAL_RESPONSE)
@@ -182,7 +182,7 @@ def test_background_index_fetch(mock_urlopen, tmp_path: Path) -> None:
 # ── Combined search ──────────────────────────────────────────────────
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_search_all(mock_urlopen, service) -> None:
     # Pre-populate official index so it doesn't need HTTP
     official_plugins = service._normalize_official(json.loads(OFFICIAL_RESPONSE))
@@ -197,7 +197,7 @@ def test_search_all(mock_urlopen, service) -> None:
     assert sources == {"smithery", "official"}
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_search_smithery_only(mock_urlopen, service) -> None:
     mock_urlopen.return_value = _mock_urlopen(SMITHERY_RESPONSE)
 
@@ -206,7 +206,7 @@ def test_search_smithery_only(mock_urlopen, service) -> None:
     assert all(r.source == "smithery" for r in results)
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_search_official_only(mock_urlopen, service) -> None:
     # Pre-populate index
     plugins = service._normalize_official(json.loads(OFFICIAL_RESPONSE))
@@ -220,7 +220,7 @@ def test_search_official_only(mock_urlopen, service) -> None:
 # ── Cache ────────────────────────────────────────────────────────────
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_cache_prevents_duplicate_fetch(mock_urlopen, service) -> None:
     mock_urlopen.return_value = _mock_urlopen(SMITHERY_RESPONSE)
 
@@ -230,7 +230,7 @@ def test_cache_prevents_duplicate_fetch(mock_urlopen, service) -> None:
     assert mock_urlopen.call_count == 1
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_cache_expired_refetches(mock_urlopen, service) -> None:
     mock_urlopen.return_value = _mock_urlopen(SMITHERY_RESPONSE)
 
@@ -251,7 +251,7 @@ def test_cache_expired_refetches(mock_urlopen, service) -> None:
 
 
 def test_clear_cache(service) -> None:
-    from cmdop_claude.models.plugin import PluginCache
+    from cmdop_claude.models.skill.plugin import PluginCache
     store = PluginCacheStore(caches={"test:q": PluginCache(query="q")})
     service._save_store(store)
     assert service._cache_path.exists()
@@ -262,7 +262,7 @@ def test_clear_cache(service) -> None:
     assert not service._cache_path.exists()
 
 
-@patch("cmdop_claude.services.plugin_service.urllib.request.urlopen")
+@patch("cmdop_claude.services.plugins.plugin_service.urllib.request.urlopen")
 def test_index_cache_expires_and_refetches(mock_urlopen, service) -> None:
     """When the official index cache expires, background fetch should re-run."""
     mock_urlopen.return_value = _mock_urlopen(OFFICIAL_RESPONSE)
