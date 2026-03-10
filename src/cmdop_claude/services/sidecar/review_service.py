@@ -110,16 +110,23 @@ class ReviewService:
             )
         return items
 
-    _MAX_PER_FILE_CHARS = 3_000
-    _MAX_TOTAL_CHARS = 60_000  # ~15k tokens — well within any model's context
+    _MAX_PER_FILE_CHARS = 8_000
+    _MAX_TOTAL_CHARS = 400_000  # ~100k tokens — leaves room for system prompt + response
 
     def _build_contents_block(self, scan_result: DocScanResult) -> str:
+        """Build file contents block, highest-priority files first.
+
+        Files are already sorted by priority in scan_result (CLAUDE.md → rules/ → other → plans/).
+        When the total budget is exhausted, lower-priority files are omitted from contents
+        but still appear in the files metadata list so the LLM knows they exist.
+        """
         parts: list[str] = []
         total = 0
+        omitted = 0
         for f in scan_result.files:
             if total >= self._MAX_TOTAL_CHARS:
-                parts.append("... (remaining files omitted — context budget reached)")
-                break
+                omitted += 1
+                continue
             fpath = self._s.claude_dir.parent / f.path
             if not fpath.exists():
                 continue
@@ -132,6 +139,8 @@ class ReviewService:
                 total += len(chunk)
             except Exception:
                 continue
+        if omitted:
+            parts.append(f"... ({omitted} lower-priority files omitted from contents — visible in file list above)")
         return "\n\n".join(parts) or "(no file contents available)"
 
     def _write_review_md(self, result: ReviewResult) -> None:
