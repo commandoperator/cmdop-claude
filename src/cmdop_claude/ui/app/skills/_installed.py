@@ -86,9 +86,11 @@ def render_installed(client: Client) -> None:
 
                 with col2:
                     st.markdown("**Allowed Tools**")
+                    _base_tools = ["Read", "Write", "Bash", "Edit", "Glob", "Grep", "WebFetch", "WebSearch"]
+                    _all_tools = _base_tools + [t for t in skill.allowed_tools if t not in _base_tools]
                     allowed_tools = st.multiselect(
                         "Select Tools",
-                        options=["Read", "Write", "Bash", "Edit", "Glob", "Grep"],
+                        options=_all_tools,
                         default=skill.allowed_tools,
                         key=f"tools_{name}",
                         label_visibility="collapsed",
