@@ -30,7 +30,7 @@ def render_marketplace(client: Client) -> None:
         st.session_state[prev_query_key] = query
 
     offset: int = st.session_state[page_key]
-    limit = 20
+    limit = 100
 
     with st.spinner("Loading skills..."):
         page = client.registry.search(query=query, limit=limit, offset=offset)

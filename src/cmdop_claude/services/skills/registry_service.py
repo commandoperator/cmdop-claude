@@ -32,7 +32,7 @@ class RegistrySkill(BaseModel):
     namespace: str = ""
     description: str = ""
     source_url: str = Field(default="", alias="sourceUrl")
-    version: str = ""
+    version: Optional[str] = None  # API returns null
     author: str = ""
     stars: int = 0
     installs: int = 0
@@ -76,7 +76,7 @@ class ClaudePluginsDevSource:
     name = "claude-plugins.dev"
     base_url = "https://claude-plugins.dev/api/skills"
 
-    def search(self, query: str = "", limit: int = 20, offset: int = 0) -> RegistryPage:
+    def search(self, query: str = "", limit: int = 100, offset: int = 0) -> RegistryPage:
         params: dict[str, str | int] = {"limit": limit, "offset": offset}
         if query:
             params["q"] = query
@@ -125,7 +125,7 @@ class RegistryService:
     def search(
         self,
         query: str = "",
-        limit: int = 20,
+        limit: int = 100,
         offset: int = 0,
         source_name: Optional[str] = None,
     ) -> RegistryPage:
