@@ -2,7 +2,7 @@
 
 Self-maintaining `.claude/` runtime for Claude Code. Keeps your project documentation accurate, your context lean, and your LLM session aware of what matters — automatically.
 
-![cmdop-claude dashboard](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/assets/plugins.png)
+![cmdop-claude](https://raw.githubusercontent.com/commandoperator/cmdop-claude/main/static/cmdop_claude.png)
 
 **~$0.003 per full cycle** (scan → review → fix → map) using DeepSeek V3.2.
 
