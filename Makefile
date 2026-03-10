@@ -29,9 +29,9 @@ from cmdop_claude.services.skills.skill_service import SkillService; \
 installed = SkillService(Config()).install_bundled_skills(); \
 print('Installed skills:', installed or 'none (already up to date)')"
 
-dashboard:
+dashboard: install
 	-pkill -f "streamlit run" 2>/dev/null; sleep 1
-	PYTHONPATH=./src:$$PYTHONPATH $(PYTHON) -m streamlit run src/cmdop_claude/ui/main.py --server.port $(PORT)
+	$(PYTHON) -m streamlit run src/cmdop_claude/ui/main.py --server.port $(PORT)
 
 test:
 	python -m pytest tests/ -q --ignore=tests/e2e

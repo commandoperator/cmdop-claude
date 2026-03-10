@@ -69,7 +69,7 @@ docs_semantic_search (MCP tool)
 pip install cmdop-claude
 
 # With Streamlit dashboard
-pip install cmdop-claude[ui]
+pip install 'cmdop-claude[ui]'
 ```
 
 ---
@@ -77,7 +77,7 @@ pip install cmdop-claude[ui]
 ## Quick Start
 
 ```bash
-pip install cmdop-claude[ui]
+pip install 'cmdop-claude[ui]'
 cd your-project
 python -m cmdop_claude.sidecar.hook setup
 ```

@@ -92,6 +92,13 @@ class SkillService(BaseService):
         post.metadata = data.model_dump(by_alias=True, exclude_none=True)
         skill_path.write_text(frontmatter.dumps(post), encoding="utf-8")
 
+    def delete_skill(self, skill_dir_name: str) -> None:
+        """Delete a skill directory permanently."""
+        skill_dir = self._skills_dir / skill_dir_name
+        if not skill_dir.exists():
+            raise FileNotFoundError(f"Skill '{skill_dir_name}' not found.")
+        shutil.rmtree(skill_dir)
+
     def search_skills(self, query: str) -> dict[str, SkillFrontmatter]:
         """Filter skills by name or description (case-insensitive)."""
         q = query.lower()
