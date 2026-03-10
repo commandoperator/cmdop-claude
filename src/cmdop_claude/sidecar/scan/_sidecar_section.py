@@ -17,7 +17,7 @@ _SIDECAR_WORKFLOW_TEMPLATE = """\
 *   Read `.claude/rules/` for project-specific coding guidelines before making changes
 *   Keep CLAUDE.md under 200 lines — move detailed rules to `.claude/rules/*.md`
 *   When working with external APIs, databases, browsers, or new tools — check if a relevant MCP plugin exists: use `mcp_list_servers` to see what's configured, or `sidecar_tasks` to browse plugins via `make -C .claude dashboard` (Plugin Browser tab)
-*   When releasing a new version, use `/commit` skill — it bumps version, writes `changelog/vX.Y.Z.md`, commits, and pushes with git tag{docs_hint}{packages_hint}
+*   Changelog files live in `.claude/changelog/` — use `/commit` skill on every release (writes `.claude/changelog/vX.Y.Z.md`, bumps version, commits, tags){docs_hint}{packages_hint}
 """
 
 # Regex: matches "## Workflow" heading up to the next "##" heading (or EOF)
