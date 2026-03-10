@@ -60,7 +60,7 @@ def render_marketplace(client: Client) -> None:
             with col_action:
                 already = client.registry.is_installed(skill)
                 if already:
-                    st.success("Installed", icon="✓")
+                    st.success("Installed", icon="✅")
                 else:
                     if st.button("Install", key=f"install_{skill.id}", type="primary"):
                         try:
