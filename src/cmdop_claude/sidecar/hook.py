@@ -200,7 +200,7 @@ def _print_version_line() -> None:
         from cmdop_claude.services.changelog import ChangelogService
         current_version = importlib.metadata.version("cmdop-claude")
         config = get_config()
-        changelog_dir = Path(config.claude_dir_path).parent / "changelog"
+        changelog_dir = Path(config.claude_dir_path) / "changelog"
         svc = ChangelogService(changelog_dir)
         entry = svc.get_entry(current_version)
         if entry:

@@ -260,7 +260,7 @@ def sidecar_activity(limit: int = 20) -> str:
 
 def _get_changelog_service() -> ChangelogService:
     config = get_config()
-    changelog_dir = Path(config.claude_dir_path).parent / "changelog"
+    changelog_dir = Path(config.claude_dir_path) / "changelog"
     return ChangelogService(changelog_dir)
 
 

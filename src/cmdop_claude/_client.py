@@ -92,7 +92,7 @@ class Client:
     @property
     def changelog(self) -> ChangelogService:
         if self._changelog_service is None:
-            changelog_dir = Path(self._config.claude_dir_path).parent / "changelog"
+            changelog_dir = Path(self._config.claude_dir_path) / "changelog"
             self._changelog_service = ChangelogService(changelog_dir)
         return self._changelog_service
 
