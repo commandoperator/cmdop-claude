@@ -22,6 +22,7 @@ Claude Code's `.claude/` folder is powerful but static. `cmdop-claude` makes it 
 - **Plugin browser** — searches Smithery + Official MCP registries (~1000 plugins), installs to `~/.claude.json`.
 - **Skill Studio** — install, browse, edit, and delete Claude Code skills. Marketplace pulls from [claude-plugins.dev](https://claude-plugins.dev) sorted by stars.
 - **Changelog system** — `changelog/vX.Y.Z.md` per release. `changelog_list` / `changelog_get` MCP tools. Visual release history tab. Version banner auto-injected into every prompt context.
+- **Auto-update** — checks PyPI once per 6 hours via `inject-tasks` hook. Runs `pip upgrade` in the background, silent and non-blocking. Update takes effect on the next Claude Code session.
 - **Streamlit dashboard** — 12-tab UI: key management, auditor, task queue, project map, plugin browser, docs browser, hooks manager, skill studio, changelog, and more.
 
 Everything runs as Claude Code hooks. Zero manual steps after setup.
@@ -337,6 +338,8 @@ src/cmdop_claude/
 ├── services/
 │   ├── changelog/
 │   │   └── changelog_service.py  # ChangelogService — parse/list/get/write vX.Y.Z.md
+│   ├── updater/
+│   │   └── update_service.py     # fetch_latest_version, is_newer, launch_upgrade (background pip)
 │   ├── docs/
 │   │   ├── docs_service.py     # DocsService — SQLite FTS5 search + MDX converter
 │   │   ├── docs_builder.py     # build_db — indexes docs into docs.db at publish time

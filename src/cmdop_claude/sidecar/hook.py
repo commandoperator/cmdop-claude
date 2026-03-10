@@ -35,6 +35,8 @@ def _is_api_key_error(e: Exception) -> bool:
 _MAP_UPDATE_DEBOUNCE = 60
 # Auto-scan interval (seconds) — review docs once per 24h
 _AUTO_SCAN_INTERVAL = 86400
+# Auto-update check interval (seconds) — check PyPI once per 6h
+_UPDATE_CHECK_INTERVAL = 6 * 3600
 
 
 def main() -> None:
@@ -178,6 +180,11 @@ def _handle_inject_tasks(sidecar: SidecarService) -> None:
     """
     _maybe_auto_scan(sidecar)
 
+    # Background auto-update check (once per 6h, non-blocking)
+    notice = _maybe_auto_update(sidecar)
+    if notice:
+        print(notice)
+
     # Prepend version line from changelog (zero LLM cost — file read only)
     _print_version_line()
 
@@ -202,6 +209,34 @@ def _print_version_line() -> None:
             print(f"📦 cmdop-claude v{entry.version}{date_part} | {entry.title}")
     except Exception:
         pass
+
+
+def _maybe_auto_update(sidecar: SidecarService) -> str | None:
+    """Check PyPI for a newer version at most once per 6h. Returns notice string or None."""
+    age = sidecar.last_action_age("update_check")
+    if age is not None and age < _UPDATE_CHECK_INTERVAL:
+        return None
+
+    # Record the check attempt first — avoids hammering PyPI on every prompt if network is down
+    sidecar._state.log_activity("update_check")
+
+    try:
+        from cmdop_claude.services.updater import fetch_latest_version, get_installed_version, is_newer, launch_upgrade
+    except ImportError:
+        return None
+
+    installed = get_installed_version()
+    latest = fetch_latest_version()
+    if latest is None or not is_newer(latest, installed):
+        return None
+
+    # Don't upgrade while a lock is held (review/fix in progress)
+    if (sidecar._sidecar_dir / ".lock").exists():
+        return None
+
+    log_path = sidecar._sidecar_dir / "update.log"
+    launch_upgrade(log_path)
+    return f"📦 cmdop-claude v{latest} available — upgrading in background (effective on next restart)"
 
 
 def _maybe_auto_scan(sidecar: SidecarService) -> None:
