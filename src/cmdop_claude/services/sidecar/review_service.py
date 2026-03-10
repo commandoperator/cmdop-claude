@@ -111,7 +111,7 @@ class ReviewService:
         return items
 
     _MAX_PER_FILE_CHARS = 8_000
-    _MAX_TOTAL_CHARS = 400_000  # ~100k tokens — leaves room for system prompt + response
+    _MAX_TOTAL_CHARS = 120_000  # ~30k tokens of file content — leaves room for metadata + system prompt + response within 163k context limit
 
     def _build_contents_block(self, scan_result: DocScanResult) -> str:
         """Build file contents block, highest-priority files first.
