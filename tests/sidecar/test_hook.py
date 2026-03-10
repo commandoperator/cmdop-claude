@@ -146,7 +146,8 @@ def test_inject_tasks_empty(mock_svc, capsys) -> None:
 
     from cmdop_claude.sidecar.hook import _handle_inject_tasks
 
-    _handle_inject_tasks(mock_svc)
+    with patch("cmdop_claude.sidecar.hook._print_version_line"):
+        _handle_inject_tasks(mock_svc)
 
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -207,7 +208,8 @@ def test_inject_tasks_auto_scan_handles_lock(mock_svc, capsys) -> None:
 
     from cmdop_claude.sidecar.hook import _handle_inject_tasks
 
-    _handle_inject_tasks(mock_svc)
+    with patch("cmdop_claude.sidecar.hook._print_version_line"):
+        _handle_inject_tasks(mock_svc)
 
     # No crash, still prints tasks
     captured = capsys.readouterr()
