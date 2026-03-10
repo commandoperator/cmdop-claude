@@ -195,7 +195,7 @@ make run              # http://localhost:8501
 make -C .claude dashboard  # from project with generated Makefile
 ```
 
-12 tabs: Health Auditor, Skill Studio, MCP Studio, Plugin Browser, Docs Browser, Hooks Manager, Sidecar Monitor, Project Map, Task Queue, Settings & Security, Trigger Graph, Changelog.
+12 tabs grouped by purpose: **Overview** (Overview, Project Map, Task Queue, Changelog) → **Content** (Skills, Plugins, Docs) → **Config** (MCP, Hooks, Settings) → **Dev** (Sidecar, Trigger Graph).
 
 **Settings & Security → LLM Provider** — configure API keys, switch providers, test connection, manage Smithery key. View all env var statuses in one place.
 

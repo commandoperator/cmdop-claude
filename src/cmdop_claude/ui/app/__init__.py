@@ -48,8 +48,42 @@ def main() -> None:
         st.markdown("### 🤖 Command Center")
         selected = option_menu(
             menu_title=None,
-            options=["Health Auditor", "Skill Studio", "MCP Studio", "Plugin Browser", "Docs Browser", "Hooks Manager", "Sidecar Monitor", "Project Map", "Task Queue", "Settings & Security", "Trigger Graph", "Changelog"],
-            icons=["heart-pulse", "stars", "box", "puzzle", "book-half", "plug", "book", "map", "list-task", "shield-lock", "diagram-project", "clock-history"],
+            options=[
+                # Overview
+                "Overview",
+                "Project Map",
+                "Task Queue",
+                "Changelog",
+                # Content
+                "Skills",
+                "Plugins",
+                "Docs",
+                # Config
+                "MCP",
+                "Hooks",
+                "Settings",
+                # Dev
+                "Sidecar",
+                "Trigger Graph",
+            ],
+            icons=[
+                # Overview
+                "heart-pulse",
+                "map",
+                "list-task",
+                "clock-history",
+                # Content
+                "stars",
+                "puzzle",
+                "book-half",
+                # Config
+                "box",
+                "plug",
+                "shield-lock",
+                # Dev
+                "activity",
+                "diagram-3",
+            ],
             menu_icon="cast",
             default_index=0,
             styles={
@@ -59,18 +93,18 @@ def main() -> None:
         )
 
     _RENDERERS = {
-        "Health Auditor": render_auditor,
-        "Skill Studio": render_skills,
-        "MCP Studio": render_mcp_studio,
-        "Plugin Browser": render_plugin_browser,
-        "Docs Browser": render_docs_browser,
-        "Hooks Manager": render_hooks,
-        "Sidecar Monitor": render_sidecar,
+        "Overview": render_auditor,
         "Project Map": render_project_map,
         "Task Queue": render_task_queue,
-        "Settings & Security": render_settings,
-        "Trigger Graph": render_graph,
         "Changelog": render_changelog,
+        "Skills": render_skills,
+        "Plugins": render_plugin_browser,
+        "Docs": render_docs_browser,
+        "MCP": render_mcp_studio,
+        "Hooks": render_hooks,
+        "Settings": render_settings,
+        "Sidecar": render_sidecar,
+        "Trigger Graph": render_graph,
     }
 
     renderer = _RENDERERS.get(selected)
