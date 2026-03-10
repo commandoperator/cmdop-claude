@@ -55,7 +55,7 @@ Store the result as `NEW_VERSION`.
 
 ## Step 3: Generate changelog
 
-Create `changelog/v{NEW_VERSION}.md` with this canonical structure (omit empty sections):
+Create `.claude/changelog/v{NEW_VERSION}.md` with this canonical structure (omit empty sections):
 
 ```markdown
 # v{NEW_VERSION} — {Short title, 5–60 chars}
@@ -87,7 +87,7 @@ Use `git diff --staged` (and `git diff` if nothing is staged) to classify change
 
 Stage all modified/new files relevant to the changes, plus:
 - `pyproject.toml` (bumped version)
-- `changelog/v{NEW_VERSION}.md` (new entry)
+- `.claude/changelog/v{NEW_VERSION}.md` (new entry)
 
 Never stage: `.env`, `*.pem`, `*.key`, `credentials.*`, `.secret*`, `dist/`, `build/`.
 Use explicit `git add <file>` paths — never `git add -A` or `git add .`.
@@ -153,7 +153,7 @@ Do NOT create a version branch — tags are the PyPI convention.
 Print:
 - New version: `v{NEW_VERSION}`
 - Commit hash: `git rev-parse --short HEAD`
-- Changelog: `changelog/v{NEW_VERSION}.md`
+- Changelog: `.claude/changelog/v{NEW_VERSION}.md`
 - Tag pushed: `v{NEW_VERSION}`
 - PyPI publish: ran / skipped / failed
 
