@@ -3,6 +3,7 @@ from typing import Optional
 
 from cmdop_claude._config import Config, configure, get_config
 from cmdop_claude.models.claude.stats import ProjectStats
+from cmdop_claude.services.changelog import ChangelogService
 from cmdop_claude.services.claude.claude_service import ClaudeService
 from cmdop_claude.services.claude.hooks_service import HooksService
 from cmdop_claude.services.claude.mcp_service import MCPService
@@ -15,7 +16,7 @@ from cmdop_claude.services.skills.registry_service import RegistryService
 class Client:
     """Main synchronous client for the Claude Control Plane."""
 
-    __slots__ = ("_config", "_skill_service", "_registry_service", "_claude_service", "_hooks_service", "_mcp_service", "_plugin_service", "_sidecar_service")
+    __slots__ = ("_config", "_skill_service", "_registry_service", "_claude_service", "_hooks_service", "_mcp_service", "_plugin_service", "_sidecar_service", "_changelog_service")
 
     def __init__(self, claude_dir_path: Optional[str] = None) -> None:
         if claude_dir_path is not None:
@@ -30,6 +31,7 @@ class Client:
         self._mcp_service: Optional[MCPService] = None
         self._plugin_service: Optional[PluginService] = None
         self._sidecar_service: Optional[SidecarService] = None
+        self._changelog_service: Optional[ChangelogService] = None
 
     @property
     def config(self) -> Config:
@@ -86,6 +88,13 @@ class Client:
     @property
     def tasks(self) -> TaskService:
         return self.sidecar._tasks
+
+    @property
+    def changelog(self) -> ChangelogService:
+        if self._changelog_service is None:
+            changelog_dir = Path(self._config.claude_dir_path).parent / "changelog"
+            self._changelog_service = ChangelogService(changelog_dir)
+        return self._changelog_service
 
     def get_project_dashboard_stats(self) -> ProjectStats:
         """Aggregate stats from all services for the dashboard."""

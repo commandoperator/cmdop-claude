@@ -14,6 +14,7 @@ from ._project_map import render_project_map
 from ._tasks import render_task_queue
 from ._settings import render_settings
 from ._graph import render_graph
+from ._changelog import render_changelog
 
 __all__ = [
     "main",
@@ -28,6 +29,7 @@ __all__ = [
     "render_task_queue",
     "render_settings",
     "render_graph",
+    "render_changelog",
 ]
 
 
@@ -46,8 +48,8 @@ def main() -> None:
         st.markdown("### 🤖 Command Center")
         selected = option_menu(
             menu_title=None,
-            options=["Health Auditor", "Skill Studio", "MCP Studio", "Plugin Browser", "Docs Browser", "Hooks Manager", "Sidecar Monitor", "Project Map", "Task Queue", "Settings & Security", "Trigger Graph"],
-            icons=["heart-pulse", "stars", "box", "puzzle", "book-half", "plug", "book", "map", "list-task", "shield-lock", "diagram-project"],
+            options=["Health Auditor", "Skill Studio", "MCP Studio", "Plugin Browser", "Docs Browser", "Hooks Manager", "Sidecar Monitor", "Project Map", "Task Queue", "Settings & Security", "Trigger Graph", "Changelog"],
+            icons=["heart-pulse", "stars", "box", "puzzle", "book-half", "plug", "book", "map", "list-task", "shield-lock", "diagram-project", "clock-history"],
             menu_icon="cast",
             default_index=0,
             styles={
@@ -68,6 +70,7 @@ def main() -> None:
         "Task Queue": render_task_queue,
         "Settings & Security": render_settings,
         "Trigger Graph": render_graph,
+        "Changelog": render_changelog,
     }
 
     renderer = _RENDERERS.get(selected)

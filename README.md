@@ -20,7 +20,9 @@ Claude Code's `.claude/` folder is powerful but static. `cmdop-claude` makes it 
 - **Docs search (FTS5)** — `docs_search` / `docs_get` MCP tools with BM25 full-text search over bundled + custom doc sources. No external service.
 - **Docs semantic search** — `docs_semantic_search` MCP tool finds conceptually similar docs using embeddings + sqlite-vec. Build index with `make embed-docs`.
 - **Plugin browser** — searches Smithery + Official MCP registries (~1000 plugins), installs to `~/.claude.json`.
-- **Streamlit dashboard** — 11-tab UI: key management, auditor, task queue, project map, plugin browser, docs browser, hooks manager, and more.
+- **Skill Studio** — install, browse, edit, and delete Claude Code skills. Marketplace pulls from [claude-plugins.dev](https://claude-plugins.dev) sorted by stars.
+- **Changelog system** — `changelog/vX.Y.Z.md` per release. `changelog_list` / `changelog_get` MCP tools. Visual release history tab. Version banner auto-injected into every prompt context.
+- **Streamlit dashboard** — 12-tab UI: key management, auditor, task queue, project map, plugin browser, docs browser, hooks manager, skill studio, changelog, and more.
 
 Everything runs as Claude Code hooks. Zero manual steps after setup.
 
@@ -128,6 +130,8 @@ python -m cmdop_claude.sidecar.hook unregister
 | `sidecar_fix` | yes | Generate fix for a task (dry-run or apply) |
 | `sidecar_init` | yes | Bootstrap `.claude/` for bare projects |
 | `sidecar_activity` | no | View recent action log |
+| `changelog_list` | no | List recent cmdop-claude releases |
+| `changelog_get` | no | Get full changelog for a version (or `"latest"`) |
 | `docs_search` | no | Full-text search across bundled + custom docs |
 | `docs_get` | no | Read a documentation file by path |
 | `docs_list` | no | List all indexed documentation files by source |
@@ -190,13 +194,17 @@ make run              # http://localhost:8501
 make -C .claude dashboard  # from project with generated Makefile
 ```
 
-11 tabs: Health Auditor, Skill Studio, MCP Studio, Plugin Browser, Docs Browser, Hooks Manager, Sidecar Monitor, Project Map, Task Queue, Settings & Security, Trigger Graph.
+12 tabs: Health Auditor, Skill Studio, MCP Studio, Plugin Browser, Docs Browser, Hooks Manager, Sidecar Monitor, Project Map, Task Queue, Settings & Security, Trigger Graph, Changelog.
 
 **Settings & Security → LLM Provider** — configure API keys, switch providers, test connection, manage Smithery key. View all env var statuses in one place.
 
 **Docs Browser** — search and read bundled documentation directly in the UI. Grouped by source, full-text search, inline markdown rendering.
 
 **Plugin Browser** — searches Smithery + Official MCP registries (~1000 plugins) with background index caching.
+
+**Skill Studio** — manage installed Claude Code skills (compact list + detail panel, delete, edit frontmatter), browse marketplace from claude-plugins.dev sorted by stars, import from GitHub.
+
+**Changelog** — browse the full release history of cmdop-claude. Select any version to read its full entry. Current version highlighted.
 
 | | |
 |---|---|
@@ -281,6 +289,9 @@ Uses `text-embedding-3-small` (1536 dims) sent directly to your configured provi
 ## File Layout
 
 ```
+changelog/
+└── vX.Y.Z.md               # one file per release (canonical format: title + date + sections)
+
 .claude/
 ├── CLAUDE.md                # project instructions (auto-generated or hand-written)
 ├── project-map.md           # directory annotations (auto-updated)
@@ -324,11 +335,16 @@ src/cmdop_claude/
 │   ├── mcp.py                  # MCPServerCommand, MCPServerURL, MCPConfig
 │   └── plugin.py               # MCPPluginInfo, PluginCache
 ├── services/
+│   ├── changelog/
+│   │   └── changelog_service.py  # ChangelogService — parse/list/get/write vX.Y.Z.md
 │   ├── docs/
 │   │   ├── docs_service.py     # DocsService — SQLite FTS5 search + MDX converter
 │   │   ├── docs_builder.py     # build_db — indexes docs into docs.db at publish time
 │   │   ├── embed_service.py    # EmbedService — text-embedding-3-small via provider
 │   │   └── vector_indexer.py   # VectorIndexer — sqlite-vec index build + search
+│   ├── skills/
+│   │   ├── skill_service.py    # SkillService — CRUD for ~/.claude/skills/
+│   │   └── registry_service.py # RegistryService — claude-plugins.dev marketplace
 │   ├── plugin_service.py       # Registry search, install, background indexing
 │   ├── mcp_service.py          # MCP config read/write
 │   └── sidecar_service/
@@ -346,7 +362,7 @@ src/cmdop_claude/
 │   ├── hook.py                 # CLI (11 commands)
 │   ├── tools/
 │   │   ├── docs_tools.py       # docs_search, docs_get, docs_list, docs_semantic_search
-│   │   └── sidecar_tools.py    # sidecar_* tools
+│   │   └── sidecar_tools.py    # sidecar_* + changelog_* tools (14 tools)
 │   ├── git_context.py          # GitContextService
 │   ├── tree_summarizer.py      # TreeSummarizer
 │   ├── toon.py                 # TOON serializer
@@ -361,12 +377,18 @@ src/cmdop_claude/
 └── ui/
     ├── main.py                 # Streamlit entry point
     └── app/
-        ├── __init__.py         # main() + tab routing (11 tabs)
+        ├── __init__.py         # main() + tab routing (12 tabs)
         ├── _settings.py        # Settings & Security tab
         ├── settings/
         │   ├── _llm.py         # LLM Provider — key mgmt, test connection, env status
         │   ├── _claude_settings.py  # settings.json editor
         │   └── _guardrails.py  # permissions editor
+        ├── _changelog.py       # Changelog tab — release history browser
+        ├── skills/
+        │   ├── __init__.py     # render_skills — tabs: Installed / Marketplace / Import
+        │   ├── _installed.py   # compact list + detail panel, delete skill
+        │   ├── _marketplace.py # claude-plugins.dev browser, install
+        │   └── _import.py      # import from GitHub URL
         └── ...                 # other tabs
 ```
 

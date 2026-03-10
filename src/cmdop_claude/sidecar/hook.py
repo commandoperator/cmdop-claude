@@ -177,9 +177,31 @@ def _handle_inject_tasks(sidecar: SidecarService) -> None:
     Review items are auto-converted to tasks.
     """
     _maybe_auto_scan(sidecar)
+
+    # Prepend version line from changelog (zero LLM cost — file read only)
+    _print_version_line()
+
     summary = sidecar.get_pending_summary(max_items=3)
     if summary:
         print(summary)
+
+
+def _print_version_line() -> None:
+    """Print a one-line version banner if a changelog entry exists for current version."""
+    try:
+        import importlib.metadata
+        from cmdop_claude.services.changelog import ChangelogService
+        current_version = importlib.metadata.version("cmdop-claude")
+        config = get_config()
+        changelog_dir = Path(config.claude_dir_path).parent / "changelog"
+        svc = ChangelogService(changelog_dir)
+        entry = svc.get_entry(current_version)
+        if entry:
+            date_str = entry.release_date.isoformat() if entry.release_date else ""
+            date_part = f" | {date_str}" if date_str else ""
+            print(f"📦 cmdop-claude v{entry.version}{date_part} | {entry.title}")
+    except Exception:
+        pass
 
 
 def _maybe_auto_scan(sidecar: SidecarService) -> None:

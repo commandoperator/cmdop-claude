@@ -55,29 +55,33 @@ Store the result as `NEW_VERSION`.
 
 ## Step 3: Generate changelog
 
-Create `changelog/v{NEW_VERSION}.md` with this structure (omit empty sections):
+Create `changelog/v{NEW_VERSION}.md` with this canonical structure (omit empty sections):
 
 ```markdown
-# v{NEW_VERSION} — {YYYY-MM-DD}
+# v{NEW_VERSION} — {Short title, 5–60 chars}
+
+**Date:** {YYYY-MM-DD}
 
 ## Features
-- ...
+- New capability added (module / function / behaviour)
 
 ## Improvements
-- ...
+- Existing thing made better
 
 ## Bug Fixes
-- ...
+- What was broken and what fixed it
 
 ## Breaking Changes
-- ...
-
-## Dependencies
-- ...
+- (omit section if none)
 ```
 
+Rules:
+- Title is mandatory — write it as a short noun phrase describing the release (e.g. "Changelog system", "Fix multiselect crash")
+- `**Date:**` line is mandatory — use today's date in ISO format
+- Omit any section with no bullets
+- Each bullet: one sentence, specific (name the module, function, or behaviour)
+
 Use `git diff --staged` (and `git diff` if nothing is staged) to classify changes.
-Be concise but specific — list affected modules and what changed.
 
 ## Step 4: Stage files
 
@@ -129,19 +133,20 @@ If confirmed:
 make publish
 ```
 
-## Step 7: Push main and create version branch
+## Step 7: Push main and tag the release
 
 ```bash
 git push origin main
-git checkout -b v{NEW_VERSION}
+git tag v{NEW_VERSION}
 git push origin v{NEW_VERSION}
-git checkout main
 ```
 
 If additional remotes exist beyond `origin`:
 ```bash
-git remote | while read remote; do git push "$remote" "v{NEW_VERSION}"; done
+git remote | while read remote; do git push "$remote" main "v{NEW_VERSION}"; done
 ```
+
+Do NOT create a version branch — tags are the PyPI convention.
 
 ## Step 8: Summary
 
@@ -149,7 +154,7 @@ Print:
 - New version: `v{NEW_VERSION}`
 - Commit hash: `git rev-parse --short HEAD`
 - Changelog: `changelog/v{NEW_VERSION}.md`
-- Branch pushed: `v{NEW_VERSION}`
+- Tag pushed: `v{NEW_VERSION}`
 - PyPI publish: ran / skipped / failed
 
 ## Rules
