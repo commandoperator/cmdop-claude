@@ -29,6 +29,7 @@ def _file_summary(path: Path, max_lines: int = 3) -> Optional[str]:
         return None
 
 
+_MAX_SCAN_FILES = 1000
 _MAX_FILE_BYTES = 500_000  # skip pathologically large files only (generated/binary)
 
 
@@ -66,6 +67,7 @@ def scan_doc_files(claude_dir: Path) -> list[DocFile]:
             candidates.append((_file_priority(rel), md_file))
 
     candidates.sort(key=lambda t: (t[0], -t[1].stat().st_mtime))
+    candidates = candidates[:_MAX_SCAN_FILES]
 
     results: list[DocFile] = []
     for _, md_file in candidates:
