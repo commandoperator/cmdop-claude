@@ -16,9 +16,14 @@ _DATE_RE = re.compile(r"^\*\*Date:\*\*\s+(\d{4}-\d{2}-\d{2})", re.MULTILINE)
 
 
 def _parse_semver(version: str) -> tuple[int, int, int]:
-    """Parse 'X.Y.Z' into sortable tuple. Returns (0,0,0) on failure."""
+    """Parse 'X.Y.Z' or 'YYYY-WXX' into sortable tuple. Returns (0,0,0) on failure."""
+    v = version.lstrip("v")
     try:
-        parts = version.lstrip("v").split(".")
+        # Week-based: 2026-W11 → (2026, 11, 0)
+        if "-W" in v:
+            year, week = v.split("-W", 1)
+            return (int(year), int(week), 0)
+        parts = v.split(".")
         return (int(parts[0]), int(parts[1]), int(parts[2]))
     except Exception:
         return (0, 0, 0)
