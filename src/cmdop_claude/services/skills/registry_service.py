@@ -80,6 +80,8 @@ class ClaudePluginsDevSource:
         params: dict[str, str | int] = {"limit": limit, "offset": offset}
         if query:
             params["q"] = query
+        else:
+            params["orderBy"] = "stars"  # default: most popular first
         try:
             r = httpx.get(self.base_url, params=params, timeout=10)
             r.raise_for_status()
