@@ -56,6 +56,9 @@ def main() -> None:
             result = sidecar.generate_review()
             print(f"Review generated: {len(result.items)} items found")
             print(f"Tokens used: {result.tokens_used} ({result.model_used})")
+            if result.items:
+                sidecar.convert_review_to_tasks(result.items)
+                print(f"Converted {len(result.items)} items to tasks")
         except RuntimeError as e:
             print(f"Skipped: {e}")
         except Exception as e:
@@ -240,16 +243,26 @@ def _maybe_auto_update(sidecar: SidecarService) -> str | None:
 
 
 def _maybe_auto_scan(sidecar: SidecarService) -> None:
-    """Run review + convert to tasks if last scan was >24h ago."""
+    """Trigger background review scan if last one was >24h ago.
+
+    Runs as a detached subprocess — never blocks the hook, never raises.
+    Results (tasks) will appear in the next prompt via get_pending_summary.
+    """
     age = sidecar.last_action_age("review")
     if age is not None and age < _AUTO_SCAN_INTERVAL:
         return
-    try:
-        result = sidecar.generate_review()
-        if result.items:
-            sidecar.convert_review_to_tasks(result.items)
-    except RuntimeError:
-        pass  # lock held — skip silently
+    if (sidecar._sidecar_dir / ".lock").exists():
+        return  # already running
+    import subprocess
+    log_path = sidecar._sidecar_dir / "scan.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_file = open(log_path, "a", encoding="utf-8")  # noqa: SIM115
+    subprocess.Popen(
+        [sys.executable, "-m", "cmdop_claude.sidecar.hook", "scan"],
+        stdout=log_file,
+        stderr=log_file,
+        close_fds=True,
+    )
 
 
 def _handle_fix(sidecar: SidecarService) -> None:
