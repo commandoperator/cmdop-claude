@@ -110,17 +110,26 @@ class ReviewService:
             )
         return items
 
+    _MAX_PER_FILE_CHARS = 3_000
+    _MAX_TOTAL_CHARS = 60_000  # ~15k tokens — well within any model's context
+
     def _build_contents_block(self, scan_result: DocScanResult) -> str:
         parts: list[str] = []
+        total = 0
         for f in scan_result.files:
+            if total >= self._MAX_TOTAL_CHARS:
+                parts.append("... (remaining files omitted — context budget reached)")
+                break
             fpath = self._s.claude_dir.parent / f.path
             if not fpath.exists():
                 continue
             try:
                 text = fpath.read_text(encoding="utf-8")
-                if len(text) > 2000:
-                    text = text[:2000] + "\n... (truncated)"
-                parts.append(f"### {f.path}\n```\n{text}\n```")
+                if len(text) > self._MAX_PER_FILE_CHARS:
+                    text = text[:self._MAX_PER_FILE_CHARS] + "\n... (truncated)"
+                chunk = f"### {f.path}\n```\n{text}\n```"
+                parts.append(chunk)
+                total += len(chunk)
             except Exception:
                 continue
         return "\n\n".join(parts) or "(no file contents available)"

@@ -29,42 +29,64 @@ def _file_summary(path: Path, max_lines: int = 3) -> Optional[str]:
         return None
 
 
+_MAX_SCAN_FILES = 60
+_MAX_FILE_BYTES = 100_000  # skip huge files (generated docs, etc.)
+
+
+def _file_priority(rel_path: str) -> int:
+    """Lower = higher priority. CLAUDE.md first, then rules/, then plans/, rest last."""
+    p = rel_path.replace("\\", "/")
+    if p == "CLAUDE.md":
+        return 0
+    if p.startswith(".claude/rules/") or p.startswith(".claude/rules\\"):
+        return 1
+    if p.startswith(".claude/plans/") or p.startswith(".claude/plans\\"):
+        return 3
+    return 2
+
+
 def scan_doc_files(claude_dir: Path) -> list[DocFile]:
-    """Scan all .md files inside .claude/ and the root CLAUDE.md."""
-    results: list[DocFile] = []
+    """Scan .md files inside .claude/ and root CLAUDE.md.
+
+    Files are prioritised: CLAUDE.md → rules/ → other .claude/ → plans/
+    and capped at _MAX_SCAN_FILES to prevent context overflow.
+    """
+    candidates: list[tuple[int, Path]] = []
     project_root = claude_dir.parent
 
     # Root CLAUDE.md
     root_md = project_root / "CLAUDE.md"
     if root_md.exists():
-        text = root_md.read_text(encoding="utf-8")
-        results.append(
-            DocFile(
-                path=_relative_path(root_md, project_root),
-                modified_at=_file_modified_dt(root_md),
-                line_count=len(text.splitlines()),
-                summary=_file_summary(root_md),
-            )
-        )
+        candidates.append((0, root_md))
 
     # All .md files in .claude/ recursively
     if claude_dir.exists():
         for md_file in claude_dir.rglob("*.md"):
-            # Skip sidecar's own output
             if ".sidecar" in md_file.parts:
                 continue
-            try:
-                text = md_file.read_text(encoding="utf-8")
-                results.append(
-                    DocFile(
-                        path=_relative_path(md_file, project_root),
-                        modified_at=_file_modified_dt(md_file),
-                        line_count=len(text.splitlines()),
-                        summary=_file_summary(md_file),
-                    )
-                )
-            except Exception:
+            rel = _relative_path(md_file, project_root)
+            candidates.append((_file_priority(rel), md_file))
+
+    # Sort by priority, then by mtime descending within same priority
+    candidates.sort(key=lambda t: (t[0], -t[1].stat().st_mtime))
+    candidates = candidates[:_MAX_SCAN_FILES]
+
+    results: list[DocFile] = []
+    for _, md_file in candidates:
+        try:
+            if md_file.stat().st_size > _MAX_FILE_BYTES:
                 continue
+            text = md_file.read_text(encoding="utf-8")
+            results.append(
+                DocFile(
+                    path=_relative_path(md_file, project_root),
+                    modified_at=_file_modified_dt(md_file),
+                    line_count=len(text.splitlines()),
+                    summary=_file_summary(md_file),
+                )
+            )
+        except Exception:
+            continue
 
     return results
 
