@@ -156,61 +156,66 @@ def test_inject_tasks_empty(mock_svc, capsys) -> None:
 # ── auto-scan ───────────────────────────────────────────────────────
 
 
-def test_inject_tasks_triggers_auto_scan_when_never_ran(mock_svc, capsys) -> None:
-    """Auto-scan triggers when review has never been run."""
+def test_inject_tasks_triggers_auto_scan_when_never_ran(mock_svc, capsys, tmp_path) -> None:
+    """Auto-scan triggers a background Popen when review has never been run."""
     mock_svc.last_action_age.return_value = None
-    review_result = MagicMock()
-    review_result.items = [MagicMock()]
-    mock_svc.generate_review.return_value = review_result
+    mock_svc._sidecar_dir = tmp_path / ".sidecar"
     mock_svc.get_pending_summary.return_value = ""
 
     from cmdop_claude.sidecar.hook import _handle_inject_tasks
 
-    _handle_inject_tasks(mock_svc)
+    with patch("subprocess.Popen") as mock_popen, \
+         patch("cmdop_claude.sidecar.hook._print_version_line"), \
+         patch("cmdop_claude.sidecar.hook._maybe_auto_update", return_value=None):
+        _handle_inject_tasks(mock_svc)
+        mock_popen.assert_called_once()
+        args = mock_popen.call_args[0][0]
+        assert "scan" in args
 
-    mock_svc.generate_review.assert_called_once()
-    mock_svc.convert_review_to_tasks.assert_called_once_with(review_result.items)
 
-
-def test_inject_tasks_triggers_auto_scan_when_stale(mock_svc, capsys) -> None:
-    """Auto-scan triggers when last review was >24h ago."""
+def test_inject_tasks_triggers_auto_scan_when_stale(mock_svc, capsys, tmp_path) -> None:
+    """Auto-scan triggers a background Popen when last review was >24h ago."""
     mock_svc.last_action_age.return_value = 90000  # >86400
-    review_result = MagicMock()
-    review_result.items = []
-    mock_svc.generate_review.return_value = review_result
+    mock_svc._sidecar_dir = tmp_path / ".sidecar"
     mock_svc.get_pending_summary.return_value = ""
 
     from cmdop_claude.sidecar.hook import _handle_inject_tasks
 
-    _handle_inject_tasks(mock_svc)
+    with patch("subprocess.Popen") as mock_popen, \
+         patch("cmdop_claude.sidecar.hook._print_version_line"), \
+         patch("cmdop_claude.sidecar.hook._maybe_auto_update", return_value=None):
+        _handle_inject_tasks(mock_svc)
+        mock_popen.assert_called_once()
 
-    mock_svc.generate_review.assert_called_once()
-    mock_svc.convert_review_to_tasks.assert_not_called()  # no items
 
-
-def test_inject_tasks_skips_auto_scan_when_recent(mock_svc, capsys) -> None:
+def test_inject_tasks_skips_auto_scan_when_recent(mock_svc, capsys, tmp_path) -> None:
     """Auto-scan skips when last review was <24h ago."""
     mock_svc.last_action_age.return_value = 3600  # 1h ago
+    mock_svc._sidecar_dir = tmp_path / ".sidecar"
     mock_svc.get_pending_summary.return_value = ""
 
     from cmdop_claude.sidecar.hook import _handle_inject_tasks
 
-    _handle_inject_tasks(mock_svc)
-
-    mock_svc.generate_review.assert_not_called()
-
-
-def test_inject_tasks_auto_scan_handles_lock(mock_svc, capsys) -> None:
-    """Auto-scan silently skips when lock is held."""
-    mock_svc.last_action_age.return_value = None
-    mock_svc.generate_review.side_effect = RuntimeError("lock held")
-    mock_svc.get_pending_summary.return_value = ""
-
-    from cmdop_claude.sidecar.hook import _handle_inject_tasks
-
-    with patch("cmdop_claude.sidecar.hook._print_version_line"):
+    with patch("subprocess.Popen") as mock_popen, \
+         patch("cmdop_claude.sidecar.hook._print_version_line"), \
+         patch("cmdop_claude.sidecar.hook._maybe_auto_update", return_value=None):
         _handle_inject_tasks(mock_svc)
+        mock_popen.assert_not_called()
 
-    # No crash, still prints tasks
-    captured = capsys.readouterr()
-    assert captured.out == ""
+
+def test_inject_tasks_auto_scan_skips_when_lock_exists(mock_svc, capsys, tmp_path) -> None:
+    """Auto-scan silently skips when lock file is present."""
+    mock_svc.last_action_age.return_value = None
+    sidecar_dir = tmp_path / ".sidecar"
+    sidecar_dir.mkdir()
+    (sidecar_dir / ".lock").write_text("")
+    mock_svc._sidecar_dir = sidecar_dir
+    mock_svc.get_pending_summary.return_value = ""
+
+    from cmdop_claude.sidecar.hook import _handle_inject_tasks
+
+    with patch("subprocess.Popen") as mock_popen, \
+         patch("cmdop_claude.sidecar.hook._print_version_line"), \
+         patch("cmdop_claude.sidecar.hook._maybe_auto_update", return_value=None):
+        _handle_inject_tasks(mock_svc)
+        mock_popen.assert_not_called()
