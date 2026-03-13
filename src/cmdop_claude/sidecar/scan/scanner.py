@@ -8,6 +8,21 @@ from typing import Optional
 from cmdop_claude.models.sidecar import DocFile, DocScanResult
 
 _PKG_NAME_RE = re.compile(r"^([A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?)")
+_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+
+
+def _parse_lazy_paths(text: str) -> Optional[list[str]]:
+    """Extract paths list from YAML frontmatter, if present. Returns None if no paths found."""
+    m = _FRONTMATTER_RE.match(text)
+    if not m:
+        return None
+    fm_text = m.group(1)
+    # Simple YAML list parsing: look for "paths:" key followed by "- item" lines
+    paths_match = re.search(r"^paths\s*:\s*\n((?:\s*-\s*.+\n?)*)", fm_text, re.MULTILINE)
+    if not paths_match:
+        return None
+    items = re.findall(r"^\s*-\s*['\"]?(.+?)['\"]?\s*$", paths_match.group(1), re.MULTILINE)
+    return items if items else None
 
 
 def _extract_pkg_name(dep_str: str) -> Optional[str]:
@@ -75,12 +90,15 @@ def scan_doc_files(claude_dir: Path) -> list[DocFile]:
             if md_file.stat().st_size > _MAX_FILE_BYTES:
                 continue
             text = md_file.read_text(encoding="utf-8")
+            rel = _relative_path(md_file, project_root)
+            lazy_paths = _parse_lazy_paths(text) if rel.startswith(".claude/rules/") else None
             results.append(
                 DocFile(
-                    path=_relative_path(md_file, project_root),
+                    path=rel,
                     modified_at=_file_modified_dt(md_file),
                     line_count=len(text.splitlines()),
                     summary=_file_summary(md_file),
+                    lazy_paths=lazy_paths,
                 )
             )
         except Exception:

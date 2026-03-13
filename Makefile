@@ -33,7 +33,7 @@ dashboard: install
 	-pkill -f "streamlit run" 2>/dev/null; sleep 1
 	$(PYTHON) -m streamlit run src/cmdop_claude/ui/main.py --server.port $(PORT)
 
-test:
+test: install
 	python -m pytest tests/ -q --ignore=tests/e2e
 
 lint:

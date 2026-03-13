@@ -8,6 +8,10 @@ from sdkrouter import Model
 
 from cmdop_claude.models.sidecar.init import InitResult, LLMFileSelectResponse, LLMInitResponse
 from cmdop_claude.sidecar.scan._sidecar_section import inject_sidecar_workflow
+from cmdop_claude.sidecar.scan._rules_templates import (
+    build_frontmatter,
+    get_templates_for_deps,
+)
 from cmdop_claude.sidecar.utils.prompts import FILE_SELECT_SYSTEM, FILE_SELECT_USER, INIT_SYSTEM, INIT_USER
 from cmdop_claude.sidecar.utils.text_utils import normalize_content
 from cmdop_claude.sidecar.scan.tree_summarizer import TreeSummarizer
@@ -169,6 +173,14 @@ class InitService:
                 model_used=f"fallback (LLM failed after {tokens_used} tokens)",
             )
 
+        # Build frontmatter lookup from templates based on detected deps
+        dep_templates = get_templates_for_deps(scan_result.dependencies)
+        _frontmatter_by_filename = {
+            t.filename: build_frontmatter(t.paths_glob)
+            for t in dep_templates
+            if t.paths_glob is not None
+        }
+
         files_created: list[str] = []
         for f in parsed.files:
             path = f.path
@@ -179,6 +191,8 @@ class InitService:
             raw = normalize_content(f.content)
             if fpath.name == "CLAUDE.md":
                 raw = inject_sidecar_workflow(raw, docs_workflow_hint, packages_hint)
+            elif path.startswith(".claude/rules/"):
+                raw = _inject_rules_frontmatter(raw, fpath.name, _frontmatter_by_filename)
             fpath.write_text(raw + "\n", encoding="utf-8")
             files_created.append(path)
 
@@ -411,6 +425,20 @@ def _build_fallback_claude_md(
     lines.append("- This file was auto-generated from project scan — review and refine")
     lines.append("")
     return "\n".join(lines)
+
+
+def _inject_rules_frontmatter(
+    content: str,
+    filename: str,
+    frontmatter_by_filename: dict[str, str],
+) -> str:
+    """Prepend paths frontmatter to a rules file if not already present and template exists."""
+    if content.startswith("---"):
+        return content  # Already has frontmatter
+    fm = frontmatter_by_filename.get(filename)
+    if fm:
+        return fm + content
+    return content
 
 
 def _build_docs_block() -> tuple[str, str, str]:

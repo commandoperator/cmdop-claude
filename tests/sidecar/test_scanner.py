@@ -6,12 +6,92 @@ from unittest.mock import patch
 import pytest
 
 from cmdop_claude.sidecar.scan.scanner import (
+    _parse_lazy_paths,
     full_scan,
     scan_dependencies,
     scan_doc_files,
     scan_git_log,
     scan_top_dirs,
 )
+
+
+# ── _parse_lazy_paths ─────────────────────────────────────────────────
+
+
+def test_parse_lazy_paths_with_paths() -> None:
+    text = '---\npaths:\n  - "**/*.py"\n  - "src/**/*.py"\n---\n\n# Python Rules\n'
+    result = _parse_lazy_paths(text)
+    assert result == ["**/*.py", "src/**/*.py"]
+
+
+def test_parse_lazy_paths_no_frontmatter() -> None:
+    text = "# Python Rules\n\nSome content here.\n"
+    result = _parse_lazy_paths(text)
+    assert result is None
+
+
+def test_parse_lazy_paths_frontmatter_no_paths() -> None:
+    text = "---\ntitle: some rule\n---\n\n# Rule\n"
+    result = _parse_lazy_paths(text)
+    assert result is None
+
+
+def test_parse_lazy_paths_single_path() -> None:
+    text = '---\npaths:\n  - "**/*.go"\n---\n\n# Go Rules\n'
+    result = _parse_lazy_paths(text)
+    assert result == ["**/*.go"]
+
+
+def test_parse_lazy_paths_unquoted() -> None:
+    text = "---\npaths:\n  - **/*.ts\n  - src/**/*.tsx\n---\n\n# TS\n"
+    result = _parse_lazy_paths(text)
+    assert result == ["**/*.ts", "src/**/*.tsx"]
+
+
+# ── scan_doc_files with lazy_paths ────────────────────────────────────
+
+
+def test_scan_doc_files_rules_with_frontmatter(tmp_path: Path) -> None:
+    claude_dir = tmp_path / ".claude"
+    rules_dir = claude_dir / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "python.md").write_text(
+        '---\npaths:\n  - "**/*.py"\n---\n\n# Python Rules\n',
+        encoding="utf-8",
+    )
+
+    result = scan_doc_files(claude_dir)
+
+    assert len(result) == 1
+    assert result[0].path == ".claude/rules/python.md"
+    assert result[0].lazy_paths == ["**/*.py"]
+
+
+def test_scan_doc_files_rules_no_frontmatter(tmp_path: Path) -> None:
+    claude_dir = tmp_path / ".claude"
+    rules_dir = claude_dir / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "workflow.md").write_text("# Workflow\n\nAlways write tests.\n", encoding="utf-8")
+
+    result = scan_doc_files(claude_dir)
+
+    assert len(result) == 1
+    assert result[0].lazy_paths is None
+
+
+def test_scan_doc_files_non_rules_md_no_lazy_paths(tmp_path: Path) -> None:
+    """Non-rules files should never have lazy_paths even if they contain frontmatter."""
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "project-map.md").write_text(
+        '---\npaths:\n  - "**/*.py"\n---\n\n# Map\n',
+        encoding="utf-8",
+    )
+
+    result = scan_doc_files(claude_dir)
+
+    assert len(result) == 1
+    assert result[0].lazy_paths is None
 
 
 # ── scan_doc_files ────────────────────────────────────────────────────

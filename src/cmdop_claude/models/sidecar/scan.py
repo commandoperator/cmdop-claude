@@ -14,6 +14,7 @@ class DocFile(CoreModel):
     modified_at: datetime
     line_count: NonNegativeInt
     summary: Optional[str] = None
+    lazy_paths: Optional[list[str]] = None
 
 
 class DocScanResult(CoreModel):

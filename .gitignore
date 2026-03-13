@@ -43,6 +43,6 @@ build/
 .env.local
 
 # Sidecar runtime state
-.claude/.sidecar/
+.claude
 .claude/.permissions.json
 .claude/project-map.md
