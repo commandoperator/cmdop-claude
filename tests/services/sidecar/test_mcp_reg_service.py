@@ -64,3 +64,32 @@ def test_is_mcp_registered_true(service, monkeypatch: pytest.MonkeyPatch) -> Non
 def test_is_mcp_registered_false(service, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(_mcp_module.subprocess, "run", _make_run_fn(get_rc=1))
     assert service.is_mcp_registered() is False
+
+
+# ── .gitignore generation ────────────────────────────────────────────
+
+
+def test_setup_creates_gitignore(service, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_mcp_module.subprocess, "run", _make_run_fn(get_rc=0))
+    created = service.setup_project_hooks()
+
+    gitignore = service._claude_dir / ".gitignore"
+    assert gitignore.exists()
+    content = gitignore.read_text()
+    assert "worktrees/" in content
+    assert ".sidecar/usage.json" in content
+    assert ".sidecar/map_cache.json" in content
+    assert "settings.local.json" in content
+    assert ".DS_Store" in content
+    assert any(".gitignore" in c for c in created)
+
+
+def test_setup_does_not_overwrite_existing_gitignore(service, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_mcp_module.subprocess, "run", _make_run_fn(get_rc=0))
+    gitignore = service._claude_dir / ".gitignore"
+    gitignore.write_text("# custom\n.sidecar/\n", encoding="utf-8")
+
+    created = service.setup_project_hooks()
+
+    assert gitignore.read_text() == "# custom\n.sidecar/\n"
+    assert not any(".gitignore" in c for c in created)

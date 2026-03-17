@@ -113,6 +113,7 @@ class MCPRegService:
             plans_dir.mkdir(parents=True, exist_ok=True)
 
         created.extend(self._generate_makefile())
+        created.extend(self._generate_gitignore())
         return created
 
     def _generate_makefile(self) -> list[str]:
@@ -151,3 +152,33 @@ init:
 """
         makefile_path.write_text(content, encoding="utf-8")
         return ["Makefile → .claude/Makefile"]
+
+    def _generate_gitignore(self) -> list[str]:
+        gitignore_path = self._s.claude_dir / ".gitignore"
+        if gitignore_path.exists():
+            return []
+
+        self._s.claude_dir.mkdir(parents=True, exist_ok=True)
+
+        content = """\
+# Agent worktrees (can be hundreds of MB)
+worktrees/
+
+# Sidecar caches (machine-specific, regenerated automatically)
+.sidecar/usage.json
+.sidecar/map_cache.json
+.sidecar/merkle_cache.json
+.sidecar/plugins_cache.json
+.sidecar/git_context.json
+.sidecar/suppressed.json
+.sidecar/scan.log
+.sidecar/fix_cache/
+
+# OS junk
+.DS_Store
+
+# Local settings (user-specific permissions)
+settings.local.json
+"""
+        gitignore_path.write_text(content, encoding="utf-8")
+        return [".gitignore → .claude/.gitignore"]
