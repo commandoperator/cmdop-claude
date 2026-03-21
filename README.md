@@ -32,13 +32,13 @@ Self-maintaining `.claude/` runtime for Claude Code. Keeps your project document
 pip install cmdop-claude
 
 # With Streamlit dashboard
-pip install 'cmdop-claude[ui]'
+pip install cmdop-claude
 ```
 
 ## Quick Start
 
 ```bash
-pip install 'cmdop-claude[ui]'
+pip install cmdop-claude
 cd your-project
 python -m cmdop_claude.sidecar.hook setup
 ```
