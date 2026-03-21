@@ -12,6 +12,7 @@ Usage from Claude Code hooks:
     python -m cmdop_claude.sidecar.hook unregister
 """
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -139,17 +140,36 @@ def _setup_and_init(sidecar: SidecarService, config: "Config") -> None:
     # API key hint — direct to dashboard instead of interactive prompt
     from cmdop_claude.models.config.cmdop_config import CmdopConfig
     cfg = CmdopConfig.load()
-    if not cfg.llm_routing.api_key and not get_config().sdkrouter_api_key:
+    _real_key = cfg.llm_routing.api_key
+    _env_key = get_config().sdkrouter_api_key
+    _has_key = (
+        (_real_key and _real_key != "test-api-key")
+        or (_env_key and _env_key != "test-api-key")
+    )
+    if not _has_key:
         print()
         print("  ⚠  No LLM API key configured.")
-        print("  Configure your provider and key in the dashboard:")
-        print("    make run              # opens http://localhost:8501")
-        print("    → Settings & Security → LLM Provider")
-        print()
-        print("  Or set an env var before running Claude Code:")
+        print("  Set an env var before running Claude Code:")
         print("    export OPENROUTER_API_KEY=sk-or-...")
         print("    export OPENAI_API_KEY=sk-...")
         print("    export SDKROUTER_API_KEY=...")
+        print()
+        # Auto-launch dashboard if streamlit is available
+        try:
+            import streamlit  # noqa: F401
+            print("  Or configure in the dashboard (launching now):")
+            print("    → Settings & Security → LLM Provider")
+            import cmdop_claude.ui
+            ui_path = Path(cmdop_claude.ui.__file__).parent / "main.py"
+            subprocess.Popen(
+                [sys.executable, "-m", "streamlit", "run", str(ui_path),
+                 "--server.port", "8501"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            print("    Dashboard: http://localhost:8501")
+        except ImportError:
+            print("  Or install the dashboard: pip install 'cmdop-claude[ui]'")
+            print("    Then run: make run → Settings & Security → LLM Provider")
 
 
 def _handle_map_update(sidecar: SidecarService, config: "Config") -> None:
